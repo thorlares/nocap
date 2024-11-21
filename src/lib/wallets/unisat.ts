@@ -16,7 +16,7 @@ export class UniSat implements Wallet {
     return typeof this.instance !== 'undefined'
   }
 
-  get network(): Network {
+  get network() {
     if (!this.instance.getChain) return this.instance.getNetwork()
     return this.instance.getChain().then((result: any) => networks[result?.enum ?? 'BITCOIN_MAINNET'])
   }

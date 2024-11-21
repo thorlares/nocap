@@ -1,4 +1,4 @@
-import { base58, bytes } from '@scure/base'
+import { bytes } from '@scure/base'
 import { toXOnlyU8 } from './utils.js'
 import { Script } from '@scure/btc-signer'
 

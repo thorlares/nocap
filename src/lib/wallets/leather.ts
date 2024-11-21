@@ -56,12 +56,12 @@ export class Leather implements Wallet {
       case 'livenet':
         return 'mainnet'
       default:
-        return this._network
+        return this._network as LeatherNetwork
     }
   }
 
   get network() {
-    return Promise.resolve(this._network)
+    return Promise.resolve(this._network as Network)
   }
 
   switchNetwork(network: Network): Promise<void> {
