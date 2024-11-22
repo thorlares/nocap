@@ -17,6 +17,7 @@ import type SlDialog from '@shoelace-style/shoelace/dist/components/dialog/dialo
 import { walletState } from '../lib/walletState'
 import { btcNetwork } from '../../lib/network'
 import { toXOnlyU8 } from '../../lib/utils'
+import { getJson } from '../../lib/fetch'
 
 @customElement('meme-dialog')
 export class MemeDialog extends LitElement {
@@ -111,29 +112,7 @@ export class MemeDialog extends LitElement {
                 e.preventDefault()
                 const data = new FormData(e.target as HTMLFormElement)
                 const amount = Number(data.get('amount'))
-                const address = this.lockAddress
-                if (!address) throw new Error('lock address not ready')
-                const p2tr = this.inscribeP2TR
-                if (!p2tr) throw new Error('p2tr not ready')
-                walletState
-                  .connector!.sendBitcoin(p2tr.address!, 20000)
-                  .then((txid) => {
-                    const tx = new btc.Transaction()
-                    tx.addInput({
-                      ...p2tr,
-                      txid,
-                      index: 0,
-                      witnessUtxo: { script: p2tr.script, amount: BigInt(20000) }
-                    })
-                    tx.addOutputAddress(walletState.address!, BigInt(1000), btcNetwork(walletState.network))
-                    return walletState
-                      .connector!.signPsbt(bytesToHex(tx.toPSBT()), {
-                        toSignInputs: [{ index: 0, publicKey: this.publicKey, disableTweakSigner: true }]
-                      })
-                      .then((psbt) => walletState.connector!.pushPsbt(psbt))
-                      .then(console.log)
-                  })
-                  .then(() => walletState.connector!.sendBitcoin(address, amount * 1e8))
+                this.lockBTC(amount)
               }}
             >
               <sl-input
@@ -211,6 +190,44 @@ OP_ENDIF
         )}
       </sl-dialog>
     `
+  }
+
+  private lockBTC(amount: number) {
+    const address = this.lockAddress
+    if (!address) throw new Error('lock address not ready')
+    const p2tr = this.inscribeP2TR
+    if (!p2tr) throw new Error('p2tr not ready')
+
+    var inscriptionFee = 0
+    const amountInscription = 650
+    walletState
+      .updateNetwork()
+      .then((network) =>
+        network == 'devnet'
+          ? Promise.resolve({ minimumFee: 1, economyFee: 1, hourFee: 1 })
+          : fetch(walletState.mempoolApiUrl('/api/v1/fees/recommended')).then(getJson)
+      )
+      .then((feeRates) => {
+        inscriptionFee = Math.max(170 * feeRates.minimumFee, 85 * (feeRates.hourFee + feeRates.economyFee))
+      })
+      .then(() => walletState.connector!.sendBitcoin(p2tr.address!, amountInscription + inscriptionFee))
+      .then((txid) => {
+        const tx = new btc.Transaction()
+        tx.addInput({
+          ...p2tr,
+          txid,
+          index: 0,
+          witnessUtxo: { script: p2tr.script, amount: BigInt(amountInscription + inscriptionFee) }
+        })
+        tx.addOutputAddress(walletState.address!, BigInt(amountInscription), btcNetwork(walletState.network))
+        return walletState
+          .connector!.signPsbt(bytesToHex(tx.toPSBT()), {
+            toSignInputs: [{ index: 0, publicKey: this.publicKey, disableTweakSigner: true }]
+          })
+          .then((psbt) => walletState.connector!.pushPsbt(psbt))
+          .then(console.log)
+      })
+      .then(() => walletState.connector!.sendBitcoin(address, amount * 1e8))
   }
 }
 
