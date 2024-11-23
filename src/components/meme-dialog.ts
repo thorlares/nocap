@@ -6,10 +6,9 @@ import { consume } from '@lit/context'
 import { customElement, property, state } from 'lit/decorators.js'
 import { bytesToHex, hexToBytes, utf8ToBytes } from '@noble/hashes/utils'
 import { LitElement, html, unsafeCSS } from 'lit'
-import { mpcPubKey, publicKey } from '../lib/contexts'
+import { mpcPubKey, walletContext } from '../lib/contexts'
 import { Ref, createRef, ref } from 'lit/directives/ref.js'
 import { scriptLock } from '../../lib/scripts'
-import { until } from 'lit/directives/until.js'
 import { when } from 'lit/directives/when.js'
 import * as btc from '@scure/btc-signer'
 import style from '/src/base.css?inline'
@@ -18,20 +17,28 @@ import { walletState } from '../lib/walletState'
 import { btcNetwork } from '../../lib/network'
 import { toXOnlyU8 } from '../../lib/utils'
 import { getJson } from '../../lib/fetch'
+import { toastImportant } from './toast'
 
 @customElement('meme-dialog')
 export class MemeDialog extends LitElement {
   static styles = [unsafeCSS(style)]
-  @property({ type: Object }) meme: any = null
+  @property({ type: String }) ca?: string
+  @state() meta: any
   private dialog: Ref<SlDialog> = createRef()
-  @consume({ context: publicKey, subscribe: true })
+  @consume({ context: walletContext.publicKey, subscribe: true })
   @state()
   readonly publicKey?: string
   @consume({ context: mpcPubKey, subscribe: true })
   @state()
   readonly mpcPubKey?: string
+  @consume({ context: walletContext.address, subscribe: true })
+  private address?: string
 
   show() {
+    fetch(`/api/token?address=${this.ca}`)
+      .then(getJson)
+      .then((meta) => (this.meta = meta))
+      .catch(toastImportant)
     this.dialog.value?.show()
   }
 
@@ -44,7 +51,7 @@ export class MemeDialog extends LitElement {
     return btc.p2wsh(
       {
         type: 'wsh',
-        script: scriptLock(hexToBytes(this.mpcPubKey), hexToBytes(this.publicKey), this.meme.id)
+        script: scriptLock(hexToBytes(this.mpcPubKey), hexToBytes(this.publicKey), this.meta.id)
       },
       btcNetwork(walletState.network)
     ).address
@@ -64,7 +71,7 @@ export class MemeDialog extends LitElement {
           hexToBytes('01'),
           utf8ToBytes('text/plain;charset=utf-8'),
           'OP_0',
-          utf8ToBytes(`${this.publicKey}|${this.mpcPubKey}|10|${this.meme.id}`),
+          utf8ToBytes(`${this.publicKey}|${this.mpcPubKey}|10|${this.meta.id}`),
           'ENDIF'
         ])
       },
@@ -75,34 +82,25 @@ export class MemeDialog extends LitElement {
 
   render() {
     return html`
-      <sl-dialog label="Meme Details" class="dialog-overview" ${ref(this.dialog)}>
+      <sl-dialog label="Fetching Coin Details" ${ref(this.dialog)}>
         ${when(
-          this.meme,
+          this.meta,
           () => html`
-            <p slot="label">${this.meme.name}</p>
+            <p slot="label">${this.meta.name}</p>
             <div class="max-h-[300px] overflow-hidden h-fit p-2 flex gap-2 w-full text-gray-400">
               <div class="min-w-32 relative self-start">
-                ${until(
-                  this.meme.meta.then(
-                    (meta: any) =>
-                      html`<img width="128" height="128" src="${meta.image}" alt="Meme" class="rounded-lg" />`
-                  ),
-                  html`<sl-spinner></sl-spinner>`
-                )}
+                <img width="128" height="128" src="${this.meta.image}" alt="Meme" class="rounded-lg" />
               </div>
               <div class="gap-2 grid h-fit">
                 <p class="text-sm w-full" style="overflow-wrap: break-word; word-break: break-all;">
-                  <span class="font-bold"> Ticker: ${this.meme.symbol} </span>
+                  <span class="font-bold"> Ticker: ${this.meta.symbol} </span>
                 </p>
                 <div class="text-xs text-blue-200 flex flex-wrap items-center gap-1">
                   <div class="flex items-center gap-1"><label for="copy-ca text-xs">ca:</label></div>
-                  <span class="w-full md:w-auto">${this.meme.id}</span>
+                  <span class="w-full md:w-auto">${this.meta.id}</span>
                 </div>
                 <p class="text-sm w-full" style="overflow-wrap: break-word; word-break: break-all;">
-                  ${until(
-                    this.meme.meta.then((result: any) => result.description),
-                    html`<sl-spinner></sl-spinner>`
-                  )}
+                  this.meta.description
                 </p>
               </div>
             </div>
@@ -167,7 +165,7 @@ OP_CHECKSIG
 OP_FALSE
 OP_IF
 # Coin address
-${this.meme.id}
+${this.meta.id}
 OP_ENDIF
 </pre>
 
@@ -175,16 +173,31 @@ OP_ENDIF
               <sl-button @click=${this.hide}>Close</sl-button>
               <sl-button
                 variant="success"
-                @click=${() => window.open(`https://pump.fun/coin/${this.meme.id}`, '_blank')}
+                @click=${() => window.open(`https://pump.fun/coin/${this.meta.id}`, '_blank')}
               >
                 View on Pump.fun
               </sl-button>
               <sl-button
                 variant="success"
-                @click=${() => window.open(`https://solscan.io/token/${this.meme.id}`, '_blank')}
+                @click=${() => window.open(`https://solscan.io/token/${this.meta.id}`, '_blank')}
               >
                 View on Solscan
               </sl-button>
+            </div>
+          `,
+          () => html`
+            <div class="animate-pulse flex space-x-4">
+              <div class="rounded-full bg-slate-600 h-10 w-10"></div>
+              <div class="flex-1 space-y-6 py-1">
+                <div class="h-2 bg-slate-600 rounded"></div>
+                <div class="space-y-3">
+                  <div class="grid grid-cols-3 gap-4">
+                    <div class="h-2 bg-slate-600 rounded col-span-2"></div>
+                    <div class="h-2 bg-slate-600 rounded col-span-1"></div>
+                  </div>
+                  <div class="h-2 bg-slate-600 rounded"></div>
+                </div>
+              </div>
             </div>
           `
         )}
@@ -200,15 +213,26 @@ OP_ENDIF
 
     var inscriptionFee = 0
     const amountInscription = 650
-    walletState
-      .updateNetwork()
-      .then((network) =>
+    Promise.all([
+      walletState.updateNetwork(),
+      fetch('/api/lock', {
+        method: 'POST',
+        body: JSON.stringify({
+          address: this.address,
+          publicKey: this.publicKey,
+          mpcPubKey: this.mpcPubKey,
+          blocks: 10,
+          ca: this.meta.id
+        })
+      })
+    ])
+      .then(([network]) =>
         network == 'devnet'
           ? Promise.resolve({ minimumFee: 1, economyFee: 1, hourFee: 1 })
           : fetch(walletState.mempoolApiUrl('/api/v1/fees/recommended')).then(getJson)
       )
       .then((feeRates) => {
-        inscriptionFee = Math.max(170 * feeRates.minimumFee, 85 * (feeRates.hourFee + feeRates.economyFee))
+        inscriptionFee = Math.max(171 * feeRates.minimumFee, 86 * (feeRates.hourFee + feeRates.economyFee))
       })
       .then(() => walletState.connector!.sendBitcoin(p2tr.address!, amountInscription + inscriptionFee))
       .then((txid) => {
@@ -228,6 +252,7 @@ OP_ENDIF
           .then(console.log)
       })
       .then(() => walletState.connector!.sendBitcoin(address, amount * 1e8))
+      .catch((e) => toastImportant(e))
   }
 }
 

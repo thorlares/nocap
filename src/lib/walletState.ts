@@ -6,8 +6,7 @@ import { Leather } from './wallets/leather'
 import { WalletStandard } from './wallets/walletStandard'
 import { getJson } from '../../lib/fetch'
 import { mempoolApiUrl } from '../../lib/utils'
-import { publicKey } from './contexts'
-import { ContextProvider } from '@lit/context'
+import { ContextProvider, createContext } from '@lit/context'
 
 export { StateController, type Unsubscribe } from '@lit-app/state'
 
@@ -198,9 +197,16 @@ class WalletState extends State {
  */
 export const walletState = new WalletState()
 
-const publicKeyProvider = new ContextProvider(document.body, { context: publicKey })
+export const walletContext = {
+  address: createContext<string>('address'),
+  publicKey: createContext<string>('publicKey')
+}
 
-walletState.subscribe(() => {
+const publicKeyProvider = new ContextProvider(document.body, { context: walletContext.publicKey })
+const addressProvider = new ContextProvider(document.body, { context: walletContext.address })
+
+walletState.subscribe((_, v) => {
+  addressProvider.setValue(v)
   publicKeyProvider.setValue('')
   walletState
     .updatePublicKey()

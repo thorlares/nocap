@@ -3,13 +3,13 @@ import { getJson } from '../lib/fetch.js'
 
 export function GET() {
   return kv
-    .get(`ol:timestamp:updateTokens`)
+    .get(`nc:timestamp:updateTokens`)
     .then((time) => {
       console.debug('last update time:', time)
       if (time && Number(time) > Date.now() - 1000 * 60 * 30) {
-        return kv.lrange('ol:token:recent', 0, 100)
+        return kv.lrange('nc:token:recent', 0, 100)
       }
-      kv.set(`ol:timestamp:updateTokens`, Date.now())
+      kv.set(`nc:timestamp:updateTokens`, Date.now())
 
       if (!process.env.BITQUERY_TOKEN) {
         console.error('BITQUERY_TOKEN is not configured')
@@ -61,8 +61,8 @@ Solana {
           })
           return kv
             .multi()
-            .lpush('ol:token:recent', ...tokens)
-            .ltrim('ol:token:recent', 0, 100)
+            .lpush('nc:token:recent', ...tokens)
+            .ltrim('nc:token:recent', 0, 100)
             .exec()
             .then(() => tokens)
         })
