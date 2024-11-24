@@ -6,7 +6,7 @@ export function POST(request: Request) {
     .json()
     .then((params) => {
       const { address, publicKey, mpcPubKey, blocks, ca, network } = params
-      const lockAddress = getLockAddress(publicKey, mpcPubKey, ca, blocks, network)
+      const lockAddress = getLockAddress(mpcPubKey, publicKey, ca, blocks, network)
       return (
         kv
           .multi()

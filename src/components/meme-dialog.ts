@@ -1,4 +1,5 @@
 import '@shoelace-style/shoelace/dist/components/button/button.js'
+import '@shoelace-style/shoelace/dist/components/carousel/carousel.js'
 import '@shoelace-style/shoelace/dist/components/dialog/dialog.js'
 import '@shoelace-style/shoelace/dist/components/divider/divider.js'
 import '@shoelace-style/shoelace/dist/components/icon/icon.js'
@@ -10,6 +11,7 @@ import { bytesToHex, hexToBytes, utf8ToBytes } from '@noble/hashes/utils'
 import { LitElement, html, unsafeCSS } from 'lit'
 import { mpcPubKey, walletContext } from '../lib/contexts'
 import { createRef, ref } from 'lit/directives/ref.js'
+import { map } from 'lit/directives/map.js'
 import { when } from 'lit/directives/when.js'
 import * as btc from '@scure/btc-signer'
 import style from '/src/base.css?inline'
@@ -20,6 +22,7 @@ import { toXOnlyU8 } from '../../lib/utils'
 import { ensureSuccess, getJson } from '../../lib/fetch'
 import { toast, toastImportant } from './toast'
 import { getLockAddress } from '../../lib/lockAddress'
+import { formatUnits } from '@ethersproject/units'
 
 @customElement('meme-dialog')
 export class MemeDialog extends LitElement {
@@ -30,6 +33,8 @@ export class MemeDialog extends LitElement {
   @state() stepClosable = false
   @state() stepError?: Error
   @state() lockingBlocks = 10
+  @state() supporters?: any[]
+  @state() locks: any
 
   private dialog = createRef<SlDialog>()
   private dialogStep = createRef<SlDialog>()
@@ -46,10 +51,23 @@ export class MemeDialog extends LitElement {
 
   show() {
     if (!this.publicKey) walletState.getPublicKey()
-    fetch(`/api/token?address=${this.ca}`)
-      .then(getJson)
-      .then((meta) => (this.meta = meta))
-      .catch(toastImportant)
+    if (this.meta?.id != this.ca) {
+      this.meta = undefined
+      fetch(`/api/token?address=${this.ca}`)
+        .then(getJson)
+        .then((meta) => (this.meta = meta))
+        .catch(toastImportant)
+      walletState.getNetwork().then((network) => {
+        fetch(`/api/supporters?address=${this.ca}&network=${network}`)
+          .then(getJson)
+          .then((supporters) => (this.supporters = supporters))
+          .catch(toastImportant)
+        fetch(`/api/locks?address=${this.ca}&network=${network}`)
+          .then(getJson)
+          .then((locks) => (this.locks = locks))
+          .catch(toastImportant)
+      })
+    }
     this.dialog.value?.show()
   }
 
@@ -95,28 +113,48 @@ export class MemeDialog extends LitElement {
             <div class="max-h-[300px] overflow-hidden h-fit p-2 flex gap-2 w-full text-gray-400">
               <div class="min-w-32 relative self-start">
                 <img width="128" height="128" src="${this.meta.image}" alt="Meme" class="rounded-lg" />
+                <div class="text-xs text-green-400 text-center">
+                  <a target="_blank" href="https://pump.fun/coin/${this.ca}" class="underline hover:no-underline"
+                    >[pump.fun]</a
+                  >
+                  <a target="_blank" href="https://solscan.io/token/${this.ca}" class="underline hover:no-underline"
+                    >[solscan]</a
+                  >
+                </div>
               </div>
               <div class="gap-2 grid h-fit">
                 <p class="text-sm w-full" style="overflow-wrap: break-word; word-break: break-all;">
                   <span class="font-bold"> Ticker: ${this.meta.symbol} </span>
                 </p>
-                <div class="text-xs text-blue-200 flex flex-wrap items-center gap-1">
-                  <div class="flex items-center gap-1"><label for="copy-ca text-xs">ca:</label></div>
-                  <span class="w-full md:w-auto">${this.ca}</span>
-                </div>
+                <p class="text-xs text-blue-200 flex flex-wrap items-center gap-1 break-all">
+                  ca:
+                  <span class="text-mono">${this.ca}</span>
+                </p>
                 <p class="text-sm w-full" style="overflow-wrap: break-word; word-break: break-all;">
                   ${this.meta.description}
                 </p>
-                <div class="text-xs text-green-400">
-                  <a target="_blank" href="https://pump.fun/coin/${this.ca}" class="underline hover:no-underline"
-                    >pump.fun</a
-                  >
-                  <a target="_blank" href="https://solscan.io/token/${this.ca}" class="underline hover:no-underline"
-                    >solscan</a
-                  >
-                </div>
+                ${when(
+                  this.locks,
+                  () => html`<p class="flex items-center text-sm font-bold text-blue-200">
+                    <sl-icon outline name="currency-bitcoin"></sl-icon>
+                    ${formatUnits(this.locks.confirmed + this.locks.unconfirmed, 8)} locked
+                  </p>`
+                )}
               </div>
             </div>
+            <div>
+              Top Supporters
+              <div class="text-gray-400 text-xs">
+                ${map(this.supporters, (supporter) => {
+                  return html`<p class="break-all">
+                    ${supporter.lock_address.slice(0, 8) + '...' + supporter.lock_address.slice(-6)}:
+                    ${formatUnits(supporter.confirmed + supporter.unconfirmed, 8)}
+                    ${supporter.unconfirmed ? '(' + formatUnits(supporter.unconfirmed, 8) + ' unconfirmed)' : ''}
+                  </p>`
+                })}
+              </div>
+            </div>
+            <sl-divider></sl-divider>
             <form
               class="w-full flex flex-col gap-2"
               @submit=${(e: Event) => {

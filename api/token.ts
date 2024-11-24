@@ -31,6 +31,7 @@ export function GET(request: Request) {
           }
           const content = result.result.content
           const meta = {
+            id: result.result.id,
             uri: content.json_uri,
             image: content.links.image,
             ...content.metadata

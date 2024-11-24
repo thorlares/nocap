@@ -1,34 +1,35 @@
-import { kv } from '@vercel/kv'
 import { getLockAddress } from '../lib/lockAddress.js'
 import { mempoolApiUrl } from '../lib/utils.js'
 import { getJson } from '../lib/fetch.js'
+import { createKysely } from '@vercel/postgres-kysely'
+import { DB } from '../api_lib/db/types.js'
 
 export function POST(request: Request) {
+  if (!process.env.DATABASE_URL) {
+    console.error('DATABASE_URL is not configured', 'DATABASE_URL', process.env.DATABASE_URL)
+    return new Response('Server is not properly configured', { status: 500 })
+  }
   return request
     .json()
     .then((params) => {
       const { publicKey, mpcPubKey, blocks, ca, network } = params
-      const lockAddress = getLockAddress(publicKey, mpcPubKey, ca, blocks, network)
+      const lockAddress = getLockAddress(mpcPubKey, publicKey, ca, blocks, network)
       return fetch(mempoolApiUrl(`/api/address/${lockAddress}`, network))
         .then(getJson)
         .then((result) => {
           const confirmed = result.chain_stats.funded_txo_sum - result.chain_stats.spent_txo_sum
           const unconfirmed = result.mempool_stats.funded_txo_sum - result.mempool_stats.spent_txo_sum
-          return (
-            kv
-              .multi()
-              // update cache that stores confirmed amount by coin address and lock address, sorted by amount
-              .zadd(network == 'livenet' ? `nc:ca:${ca}:confirmed` : `nc:ca:${ca}:confirmed:testnet`, {
-                score: confirmed,
-                member: lockAddress
-              })
-              // update cache that stores unconfirmed amount by coin address and lock address
-              .zadd(network == 'livenet' ? `nc:ca:${ca}:unconfirmed` : `nc:ca:${ca}:unconfirmed:testnet`, {
-                score: unconfirmed,
-                member: lockAddress
-              })
-              .exec()
-          )
+
+          return createKysely<DB>({ connectionString: process.env.DATABASE_URL })
+            .insertInto(network == 'livenet' ? 'locked_amounts' : 'locked_amounts_testnet')
+            .values({
+              ca,
+              lock_address: lockAddress,
+              confirmed,
+              unconfirmed
+            })
+            .onConflict((oc) => oc.column('ca').column('lock_address').doUpdateSet({ confirmed, unconfirmed }))
+            .execute()
         })
     })
     .then(() => new Response())
