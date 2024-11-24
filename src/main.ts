@@ -3,6 +3,7 @@ import { customElement, state } from 'lit/decorators.js'
 import { Ref, createRef, ref } from 'lit/directives/ref.js'
 import { until } from 'lit/directives/until.js'
 import { when } from 'lit/directives/when.js'
+import { map } from 'lit/directives/map.js'
 import baseStyle from './base.css?inline'
 import style from './main.css?inline'
 import { getJson } from '../lib/fetch'
@@ -16,6 +17,8 @@ import SlAnimation from '@shoelace-style/shoelace/dist/components/animation/anim
 import './components/connect.ts'
 import './components/meme-dialog.ts'
 import { MemeDialog } from './components/meme-dialog'
+import { walletState } from './lib/walletState'
+import { formatUnits } from '@ethersproject/units'
 
 setBasePath(import.meta.env.MODE === 'development' ? 'node_modules/@shoelace-style/shoelace/dist' : '/')
 
@@ -24,12 +27,16 @@ export class AppMain extends LitElement {
   static styles = [unsafeCSS(baseStyle), unsafeCSS(style)]
   @state() lastCreate: any
   @state() lastCreateAnim: Ref<SlAnimation> = createRef<SlAnimation>()
+  @state() topMemes?: any[]
   private memeDialog: Ref<MemeDialog> = createRef()
 
   connectedCallback(): void {
     super.connectedCallback()
 
-    this.busyUpdaters.push(this.busyLoop(this.getLastCreatedCoin.bind(this)))
+    this.busyUpdaters.push(
+      this.busyLoop(this.getLastCreatedCoin.bind(this)),
+      this.busyLoop(this.updateMemeList.bind(this), 10000, 10000)
+    )
   }
 
   fetchMeta(uri: string) {
@@ -49,7 +56,14 @@ export class AppMain extends LitElement {
       while (true) {
         const result = f()
         if (result instanceof Promise) await result
-        await new Promise((r) => setTimeout(r, minInterval + Math.floor(Math.random() * (maxInterval - minInterval))))
+        await new Promise((r) =>
+          setTimeout(
+            r,
+            maxInterval == minInterval
+              ? maxInterval
+              : minInterval + Math.floor(Math.random() * (maxInterval - minInterval))
+          )
+        )
       }
     })()
   }
@@ -81,7 +95,18 @@ export class AppMain extends LitElement {
             this.lastCreateAnim.value!.play = true
           })
       })
-      .catch((error) => console.error(error))
+      .catch(console.error)
+  }
+
+  updateMemeList() {
+    return walletState
+      .getNetwork()
+      .then((network) =>
+        fetch(`/api/topMemes?network=${network}`)
+          .then(getJson)
+          .then((memes) => (this.topMemes = memes))
+      )
+      .catch(console.error)
   }
 
   render() {
@@ -173,6 +198,33 @@ export class AppMain extends LitElement {
             />
             <button class="bg-green-300 text-black p-2 rounded hover:bg-green-500" type="submit">find</button>
           </form>
+        </div>
+        <div class="flex justify-center mt-8">
+          <div class="w-[90vw] max-w-[550px]">
+            <h2 class="text-xl mb-4 text-center">Top Coins</h2>
+            <div class="grid gap-4">
+              ${map(
+                this.topMemes,
+                (meme) => html`
+                  <div
+                    class="bg-gray-800 rounded-lg text-sm p-4 cursor-pointer hover:bg-gray-700"
+                    @click=${() => {
+                      this.memeDialog.value!.ca = meme.ca
+                      this.memeDialog.value!.show()
+                    }}
+                  >
+                    <div class="flex items-center justify-between">
+                      <span class="font-mono">${meme.ca}</span>
+                      <span class="flex items-center text-sm text-blue-200">
+                        <sl-icon outline name="currency-bitcoin"></sl-icon>
+                        ${formatUnits(meme.confirmed + meme.unconfirmed, 8)}
+                      </span>
+                    </div>
+                  </div>
+                `
+              )}
+            </div>
+          </div>
         </div>
       </main>
     `
