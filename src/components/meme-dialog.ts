@@ -23,6 +23,7 @@ import { ensureSuccess, getJson } from '../../lib/fetch'
 import { toast, toastImportant } from './toast'
 import { getLockAddress } from '../../lib/lockAddress'
 import { formatUnits } from '@ethersproject/units'
+import { Network } from '../../lib/types'
 
 @customElement('meme-dialog')
 export class MemeDialog extends LitElement {
@@ -57,16 +58,7 @@ export class MemeDialog extends LitElement {
         .then(getJson)
         .then((meta) => (this.meta = meta))
         .catch(toastImportant)
-      walletState.getNetwork().then((network) => {
-        fetch(`/api/supporters?address=${this.ca}&network=${network}`)
-          .then(getJson)
-          .then((supporters) => (this.supporters = supporters))
-          .catch(toastImportant)
-        fetch(`/api/locks?address=${this.ca}&network=${network}`)
-          .then(getJson)
-          .then((locks) => (this.locks = locks))
-          .catch(toastImportant)
-      })
+      walletState.getNetwork().then((network) => this.updateLockDetails(network))
     }
     this.dialog.value?.show()
   }
@@ -75,9 +67,20 @@ export class MemeDialog extends LitElement {
     this.dialog.value?.hide()
   }
 
+  updateLockDetails(network: Network) {
+    fetch(`/api/supporters?address=${this.ca}&network=${network}`)
+      .then(getJson)
+      .then((supporters) => (this.supporters = supporters))
+      .catch(toastImportant)
+    fetch(`/api/locks?address=${this.ca}&network=${network}`)
+      .then(getJson)
+      .then((locks) => (this.locks = locks))
+      .catch(toastImportant)
+  }
+
   get getLockAddress() {
     if (!this.mpcPubKey || !this.publicKey) return 'loading'
-    return getLockAddress(this.mpcPubKey, this.publicKey, this.ca!, this.lockingBlocks, walletState.network)
+    return getLockAddress(this.mpcPubKey, this.publicKey, this.ca!, this.lockingBlocks, walletState.network!)
   }
 
   get p2trInscription() {
@@ -136,8 +139,10 @@ export class MemeDialog extends LitElement {
                 ${when(
                   this.locks,
                   () => html`<p class="flex items-center text-sm font-bold text-blue-200">
-                    <sl-icon outline name="currency-bitcoin"></sl-icon>
-                    ${formatUnits(this.locks.confirmed + this.locks.unconfirmed, 8)} locked
+                    Locked <sl-icon outline name="currency-bitcoin"></sl-icon> ${formatUnits(
+                      this.locks.confirmed + this.locks.unconfirmed,
+                      8
+                    )}
                   </p>`
                 )}
               </div>
@@ -403,6 +408,7 @@ OP_ENDIF
         })
           .then(ensureSuccess)
           .catch(console.warn)
+        this.updateLockDetails(walletState.network)
         toastImportant(`Successfully locked ${amount} BTC to <span class="font-mono break-all">${lockAddress}</span>`)
         this.dialogStep.value?.hide()
       })
