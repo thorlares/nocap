@@ -99,13 +99,9 @@ export class AppMain extends LitElement {
   }
 
   updateMemeList() {
-    return walletState
-      .getNetwork()
-      .then((network) =>
-        fetch(`/api/topMemes?network=${network}`)
-          .then(getJson)
-          .then((memes) => (this.topMemes = memes))
-      )
+    return fetch(`/api/topMemes?network=${walletState.network ?? 'testnet'}`)
+      .then(getJson)
+      .then((memes) => (this.topMemes = memes))
       .catch(console.error)
   }
 
