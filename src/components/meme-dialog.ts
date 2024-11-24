@@ -408,7 +408,7 @@ OP_ENDIF
         })
           .then(ensureSuccess)
           .catch(console.warn)
-        this.updateLockDetails(walletState.network)
+        this.updateLockDetails(walletState.network!)
         toastImportant(`Successfully locked ${amount} BTC to <span class="font-mono break-all">${lockAddress}</span>`)
         this.dialogStep.value?.hide()
       })
