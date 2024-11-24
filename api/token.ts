@@ -12,7 +12,6 @@ export function GET(request: Request) {
     .get(cacheKey)
     .then((cached: any) => {
       if (cached) return new Response(JSON.stringify(cached))
-      console.log('fetching from helius')
       return fetch(`https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`, {
         method: 'POST',
         headers: {

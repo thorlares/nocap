@@ -1,4 +1,4 @@
-import { Network } from './types'
+import { Network } from './types.js'
 
 import * as btc from '@scure/btc-signer'
 

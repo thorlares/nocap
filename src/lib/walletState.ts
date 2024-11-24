@@ -10,6 +10,11 @@ import { ContextProvider, createContext } from '@lit/context'
 
 export { StateController, type Unsubscribe } from '@lit-app/state'
 
+export const walletContext = {
+  address: createContext<string>('address'),
+  publicKey: createContext<string>('publicKey')
+}
+
 class WalletState extends State {
   /** type of last connected wallet, subscribe with `wallet` */
   @storage({ key: 'wallet' }) @property() wallet?: WalletType
@@ -25,6 +30,7 @@ class WalletState extends State {
   }
 
   // ---- address ----
+  private addressProvider = new ContextProvider(document.body, { context: walletContext.address })
   @property({ skipReset: true }) private _address?: string
   /** connected address, subscribe with `_address` */
   public get address(): string | undefined {
@@ -38,13 +44,21 @@ class WalletState extends State {
   public async updateAddress(): Promise<string> {
     return (this.promises['address'] ??= this.getConnector()
       .then((connector) => connector.accounts)
-      .then((accounts) => (this._address = accounts[0]))
+      .then((accounts) => (this.addressProvider.setValue(accounts[0]), (this._address = accounts[0])))
       .finally(() => delete this.promises['address']))
   }
 
   protected onAccountChanged = (accounts: string[]) => {
     this.reset(false)
-    if (accounts) this._address = accounts[0]
+    if (accounts) {
+      this._address = accounts[0]
+      this.addressProvider.setValue(accounts[0])
+      this.publicKeyProvider.setValue('')
+      this.updatePublicKey()
+    } else {
+      this.addressProvider.setValue('')
+      this.publicKeyProvider.setValue('')
+    }
   }
 
   // ---- network ----
@@ -70,6 +84,7 @@ class WalletState extends State {
   }
 
   // ---- public key ----
+  private publicKeyProvider = new ContextProvider(document.body, { context: walletContext.publicKey })
   @property() private _publicKey?: string
   /** connected public key, subscribe with `_publicKey` */
   public get publicKey(): string | undefined {
@@ -83,7 +98,7 @@ class WalletState extends State {
   public async updatePublicKey(): Promise<string> {
     return (this.promises['publicKey'] ??= this.getConnector()
       .then((connector) => connector.publicKey)
-      .then((pubKey) => (this._publicKey = pubKey))
+      .then((pubKey) => (this.publicKeyProvider.setValue(pubKey), (this._publicKey = pubKey)))
       .finally(() => delete this.promises['publicKey']))
   }
 
@@ -179,6 +194,8 @@ class WalletState extends State {
       if (this._connector?.installed) this._connector.removeListener('accountsChanged', this.onAccountChanged)
       this._connector = undefined
       this._address = undefined
+      this.addressProvider.setValue('')
+      this.publicKeyProvider.setValue('')
     }
   }
 }
@@ -196,20 +213,3 @@ class WalletState extends State {
  * walletState.subscribe(callback, "_address")
  */
 export const walletState = new WalletState()
-
-export const walletContext = {
-  address: createContext<string>('address'),
-  publicKey: createContext<string>('publicKey')
-}
-
-const publicKeyProvider = new ContextProvider(document.body, { context: walletContext.publicKey })
-const addressProvider = new ContextProvider(document.body, { context: walletContext.address })
-
-walletState.subscribe((_, v) => {
-  addressProvider.setValue(v)
-  publicKeyProvider.setValue('')
-  walletState
-    .updatePublicKey()
-    .then((publicKey) => publicKeyProvider.setValue(publicKey))
-    .catch((e) => console.info('Failed to update public key', e))
-}, '_address')

@@ -1,3 +1,9 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer components {
+  sl-divider {
+    border-top: solid var(--width) var(--color);
+  }
+}
