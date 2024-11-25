@@ -5,7 +5,10 @@ import '@shoelace-style/shoelace/dist/components/divider/divider.js'
 import '@shoelace-style/shoelace/dist/components/icon/icon.js'
 import '@shoelace-style/shoelace/dist/components/input/input.js'
 import '@shoelace-style/shoelace/dist/components/spinner/spinner.js'
-import { consume } from '@lit/context'
+import '@shoelace-style/shoelace/dist/components/tab/tab.js'
+import '@shoelace-style/shoelace/dist/components/tab-group/tab-group.js'
+import '@shoelace-style/shoelace/dist/components/tab-panel/tab-panel.js'
+import { consume, Context, ContextConsumer } from '@lit/context'
 import { customElement, property, state } from 'lit/decorators.js'
 import { bytesToHex, hexToBytes, utf8ToBytes } from '@noble/hashes/utils'
 import { LitElement, html, unsafeCSS } from 'lit'
@@ -37,6 +40,7 @@ export class MemeDialog extends LitElement {
   @state() lockingBlocks = 10
   @state() supporters?: any[]
   @state() lockedAmount: any
+  @state() lockedUtxos?: any[]
 
   private dialog = createRef<SlDialog>()
   private dialogStep = createRef<SlDialog>()
@@ -51,14 +55,25 @@ export class MemeDialog extends LitElement {
   @state()
   readonly address?: string
 
+  private contextConsumers: any[] = []
+
   show() {
     if (!this.publicKey) walletState.getPublicKey()
     if (this.meta?.id != this.ca) {
-      this.meta = undefined
+      this.meta = this.supporters = this.lockedAmount = this.lockedUtxos = undefined
+      // update meta
       fetch(`/api/token?address=${this.ca}`)
         .then(getJson)
         .then((meta) => (this.meta = meta))
         .catch(toastImportant)
+      // @todo: unsubscribe when changed
+      this.contextConsumers.push(
+        new ContextConsumer(this, {
+          context: walletContext.publicKey,
+          callback: () => this.updateLockUtxos(),
+          subscribe: true
+        })
+      )
       walletState.getNetwork().then((network) => this.updateLockDetails(network))
     }
     this.dialog.value?.show()
@@ -68,8 +83,14 @@ export class MemeDialog extends LitElement {
     this.dialog.value?.hide()
   }
 
+  updateLockUtxos() {
+    fetch(walletState.mempoolApiUrl(`/api/address/${this.getLockAddress}/utxo`))
+      .then(getJson)
+      .then((lockedUtxos) => (this.lockedUtxos = lockedUtxos))
+      .catch(console.warn)
+  }
+
   updateLockDetails(network: Network) {
-    this.supporters = this.lockedAmount = undefined
     fetch(`/api/supporters?address=${this.ca}&network=${network}`)
       .then(getJson)
       .then((supporters) => (this.supporters = supporters))
@@ -78,6 +99,7 @@ export class MemeDialog extends LitElement {
       .then(getJson)
       .then((lockedAmount) => (this.lockedAmount = lockedAmount))
       .catch(console.warn)
+    if (this.getLockAddress != 'loading') this.updateLockUtxos()
   }
 
   get getLockAddress() {
@@ -149,59 +171,68 @@ export class MemeDialog extends LitElement {
                 )}
               </div>
             </div>
-            <div>
-              <span class="text-sm">Top Supporters</span>
-              <div class="text-gray-400 text-xs">
+            <sl-tab-group>
+              <sl-tab slot="nav" panel="support">Top Supporters</sl-tab>
+              <sl-tab-panel name="support" class="text-gray-400 text-xs">
                 ${map(this.supporters, (supporter) => {
                   return html`<p class="break-all">
-                    ${supporter.lock_address.slice(0, 8) + '...' + supporter.lock_address.slice(-6)}:
-                    ${formatUnits(supporter.confirmed + supporter.unconfirmed, 8)}
+                    <a
+                      target="_blank"
+                      href="${walletState.mempoolUrl}/address/${supporter.lock_address}"
+                      class="underline hover:no-underline"
+                      >${supporter.lock_address.slice(0, 8) + '...' + supporter.lock_address.slice(-6)}</a
+                    >: ${formatUnits(supporter.confirmed + supporter.unconfirmed, 8)}
                     ${supporter.unconfirmed ? '(' + formatUnits(supporter.unconfirmed, 8) + ' unconfirmed)' : ''}
                   </p>`
                 })}
-              </div>
-            </div>
-            <sl-divider></sl-divider>
-            <form
-              class="w-full flex flex-col gap-2"
-              @submit=${(e: Event) => {
-                e.preventDefault()
-                const data = new FormData(e.target as HTMLFormElement)
-                const amount = Number(data.get('amount'))
-                this.lockBTC(amount)
-              }}
-            >
-              <sl-input
-                name="amount"
-                label="Support with"
-                class="w-full"
-                placeholder="Enter an amount of bitcoin"
-                ?disabled=${!this.publicKey}
-              ></sl-input>
-              ${when(
-                this.publicKey,
-                () =>
-                  html`
-                    <button type="submit" class="w-full p-2 bg-blue-500 text-white hover:bg-blue-700">Lock</button>
-                  `,
-                () => html`<connect-button variant="primary" class="w-full"></connect-button>`
-              )}
-            </form>
+              </sl-tab-panel>
+            </sl-tab-group>
+            <sl-tab-group>
+              <sl-tab slot="nav" panel="support">Support</sl-tab>
+              <sl-tab slot="nav" panel="unlock" ?disabled=${!this.lockedUtxos}>Unlock</sl-tab>
 
-            ${when(
-              this.publicKey,
-              () => html`
-                <p class="text-sm mt-4 text-sl-neutral-600">
-                  Self-Custody Address:
-                  <span class="font-mono break-words text-[var(--sl-color-neutral-700)]">${this.getLockAddress}</span>
-                </p>
-                <p class="text-sm text-sl-neutral-600">
-                  Self-Custody Script:
-                  <!-- <a class="text-green-600 underline hover:no-underline cursor-pointer">verify</a> -->
-                </p>
-                <pre
-                  class="mt-2 p-1 px-2 w-full overflow-x-scroll text-xs text-[var(--sl-color-neutral-700)] border rounded border-[var(--sl-color-neutral-200)]"
+              <sl-tab-panel name="support">
+                <form
+                  class="w-full flex flex-col gap-2"
+                  @submit=${(e: Event) => {
+                    e.preventDefault()
+                    const data = new FormData(e.target as HTMLFormElement)
+                    const amount = Number(data.get('amount'))
+                    this.lockBTC(amount)
+                  }}
                 >
+                  <sl-input
+                    name="amount"
+                    class="w-full"
+                    placeholder="Enter an amount of bitcoin"
+                    ?disabled=${!this.publicKey}
+                  ></sl-input>
+                  ${when(
+                    this.publicKey,
+                    () =>
+                      html`
+                        <button type="submit" class="w-full p-2 bg-blue-500 text-white hover:bg-blue-700">Lock</button>
+                      `,
+                    () => html`<connect-button variant="primary" class="w-full"></connect-button>`
+                  )}
+                </form>
+
+                ${when(
+                  this.publicKey,
+                  () => html`
+                    <p class="text-sm mt-4 text-sl-neutral-600">
+                      Self-Custody Address:
+                      <span class="font-mono text-xs break-words text-[var(--sl-color-neutral-700)]"
+                        >${this.getLockAddress}</span
+                      >
+                    </p>
+                    <p class="text-sm mt-2 text-sl-neutral-600">
+                      Self-Custody Script:
+                      <!-- <a class="text-green-600 underline hover:no-underline cursor-pointer">verify</a> -->
+                    </p>
+                    <pre
+                      class="mt-2 p-1 px-2 w-full overflow-x-scroll text-xs text-[var(--sl-color-neutral-700)] border rounded border-[var(--sl-color-neutral-200)]"
+                    >
 OP_DEPTH
 OP_1SUB
 # Check if more than one signature
@@ -229,8 +260,23 @@ OP_IF
 ${this.ca}
 OP_ENDIF
 </pre>
-              `
-            )}
+                  `
+                )}
+              </sl-tab-panel>
+              <sl-tab-panel name="unlock" class="text-gray-400 text-xs">
+                ${map(
+                  this.lockedUtxos,
+                  (utxo) => html`<p class="font-mono break-all">
+                    <a
+                      target="_blank"
+                      href="${walletState.mempoolUrl}/tx/${utxo.txid}"
+                      class="underline hover:no-underline"
+                      >${utxo.txid.slice(0, 8) + '...' + utxo.txid.slice(-6)}</a
+                    >: ${formatUnits(utxo.value, 8)}
+                  </p>`
+                )}
+              </sl-tab-panel>
+            </sl-tab-group>
           `,
           () => html`
             <div class="animate-pulse flex space-x-4">
