@@ -196,30 +196,49 @@ export class AppMain extends LitElement {
           </form>
         </div>
         <div class="flex justify-center mt-8">
-          <div class="w-[90vw] max-w-[550px]">
+          <div class="w-[90vw] max-w-[500px]">
             <h2 class="text-xl mb-4 text-center">Top Coins</h2>
-            <div class="grid gap-4">
-              ${map(
-                this.topMemes,
-                (meme) => html`
-                  <div
-                    class="bg-gray-800 rounded-lg text-sm p-4 cursor-pointer hover:bg-gray-700"
-                    @click=${() => {
-                      this.memeDialog.value!.ca = meme.ca
-                      this.memeDialog.value!.show()
-                    }}
-                  >
-                    <div class="flex items-center justify-between">
-                      <span class="font-mono">${meme.ca}</span>
-                      <span class="flex items-center text-sm text-blue-200">
-                        <sl-icon outline name="currency-bitcoin"></sl-icon>
-                        ${formatUnits(meme.confirmed + meme.unconfirmed, 8)}
-                      </span>
+            ${when(
+              this.topMemes,
+              () => html`
+                <div class="grid gap-2">
+                  ${map(
+                    this.topMemes,
+                    (meme) => html`
+                      <div
+                        class="bg-gray-800 rounded-lg text-sm p-2 cursor-pointer hover:bg-gray-700 transition-colors"
+                        @click=${() => {
+                          this.memeDialog.value!.ca = meme.ca
+                          this.memeDialog.value!.show()
+                        }}
+                      >
+                        <div class="flex items-center justify-between">
+                          <span class="font-mono text-neutral-200">${meme.ca}</span>
+                          <span class="flex items-center text-blue-200">
+                            <sl-icon outline name="currency-bitcoin"></sl-icon>
+                            ${formatUnits(meme.confirmed + meme.unconfirmed, 8)}
+                          </span>
+                        </div>
+                      </div>
+                    `
+                  )}
+                </div>
+              `,
+              () => html`
+                <div class="animate-pulse flex space-x-4">
+                  <div class="flex-1 space-y-6 py-1">
+                    <div class="h-2 bg-slate-600 rounded"></div>
+                    <div class="space-y-3">
+                      <div class="grid grid-cols-3 gap-4">
+                        <div class="h-2 bg-slate-600 rounded col-span-2"></div>
+                        <div class="h-2 bg-slate-600 rounded col-span-1"></div>
+                      </div>
+                      <div class="h-2 bg-slate-600 rounded"></div>
                     </div>
                   </div>
-                `
-              )}
-            </div>
+                </div>
+              `
+            )}
           </div>
         </div>
       </main>

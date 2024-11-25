@@ -1,7 +1,6 @@
 import { createKysely } from '@vercel/postgres-kysely'
 import { DB } from '../api_lib/db/types.js'
 import { sql } from 'kysely'
-import { sql } from 'kysely'
 
 export function GET(request: Request) {
   if (!process.env.DATABASE_URL) {

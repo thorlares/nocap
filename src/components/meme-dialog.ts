@@ -30,12 +30,13 @@ export class MemeDialog extends LitElement {
   static styles = [unsafeCSS(style)]
   @property({ type: String }) ca?: string
   @state() meta: any
-  @state() step = 0
-  @state() stepClosable = false
-  @state() stepError?: Error
+  @state() lockStep = 0
+  @state() lockDialogClosable = false
+  @state() lockDialogHasInscription = false
+  @state() lockDialogError?: Error
   @state() lockingBlocks = 10
   @state() supporters?: any[]
-  @state() locks: any
+  @state() lockedAmount: any
 
   private dialog = createRef<SlDialog>()
   private dialogStep = createRef<SlDialog>()
@@ -68,14 +69,15 @@ export class MemeDialog extends LitElement {
   }
 
   updateLockDetails(network: Network) {
+    this.supporters = this.lockedAmount = undefined
     fetch(`/api/supporters?address=${this.ca}&network=${network}`)
       .then(getJson)
       .then((supporters) => (this.supporters = supporters))
-      .catch(toastImportant)
-    fetch(`/api/locks?address=${this.ca}&network=${network}`)
+      .catch(console.warn)
+    fetch(`/api/lockedAmount?address=${this.ca}&network=${network}`)
       .then(getJson)
-      .then((locks) => (this.locks = locks))
-      .catch(toastImportant)
+      .then((lockedAmount) => (this.lockedAmount = lockedAmount))
+      .catch(console.warn)
   }
 
   get getLockAddress() {
@@ -137,10 +139,10 @@ export class MemeDialog extends LitElement {
                   ${this.meta.description}
                 </p>
                 ${when(
-                  this.locks,
+                  this.lockedAmount,
                   () => html`<p class="flex items-center text-sm font-bold text-blue-200">
                     Locked <sl-icon outline name="currency-bitcoin"></sl-icon> ${formatUnits(
-                      this.locks.confirmed + this.locks.unconfirmed,
+                      this.lockedAmount.confirmed + this.lockedAmount.unconfirmed,
                       8
                     )}
                   </p>`
@@ -148,7 +150,7 @@ export class MemeDialog extends LitElement {
               </div>
             </div>
             <div>
-              Top Supporters
+              <span class="text-sm">Top Supporters</span>
               <div class="text-gray-400 text-xs">
                 ${map(this.supporters, (supporter) => {
                   return html`<p class="break-all">
@@ -256,13 +258,13 @@ OP_ENDIF
         }}
       >
         <sl-alert
-          ?closable=${this.stepClosable}
+          ?closable=${this.lockDialogClosable}
           open
           class="[&::part(close-button)]:items-start [&::part(close-button)]:mt-3"
           @sl-hide=${() => this.dialogStep.value?.hide()}
         >
           ${when(
-            this.stepError,
+            this.lockDialogError,
             () =>
               html`
                 <div class="flex gap-2">
@@ -271,16 +273,27 @@ OP_ENDIF
                     class="flex-none mt-0.5 text-rose-500"
                     style="font-size: 1.1rem;"
                   ></sl-icon>
-                  <p class="text-[var(--sl-color-neutral-800)]">${this.stepError?.message}</p>
+                  <p class="text-[var(--sl-color-neutral-800)]">${this.lockDialogError?.message}</p>
                 </div>
               `,
             () => html`<p>3 Steps to go</p>`
           )}
           <sl-divider></sl-divider>
-          <div class="flex gap-2 ${when(this.step != 1, () => 'text-neutral-500')}">
+          <div class="flex gap-2 ${when(this.lockStep != 1, () => 'text-neutral-500')}">
             <sl-icon
               name="1-circle"
-              class="flex-none mt-1 ${when(this.step == 1, () => 'animate-pulse text-sky-500')}"
+              class="flex-none mt-1 ${when(this.lockStep == 1, () => 'animate-pulse text-sky-500')}"
+              style="font-size: 1.1qrem;"
+            ></sl-icon>
+            <div class="flex-1">
+              <p>Has inscription? ${when(this.lockStep != 1, () => (this.lockDialogHasInscription ? 'Yes' : 'No'))}</p>
+            </div>
+          </div>
+          <sl-divider></sl-divider>
+          <div class="flex gap-2 ${when(this.lockStep != 2, () => 'text-neutral-500')}">
+            <sl-icon
+              name="2-circle"
+              class="flex-none mt-1 ${when(this.lockStep == 2, () => 'animate-pulse text-sky-500')}"
               style="font-size: 1.1qrem;"
             ></sl-icon>
             <div class="flex-1">
@@ -294,10 +307,10 @@ OP_ENDIF
             </div>
           </div>
           <sl-divider></sl-divider>
-          <div class="flex gap-2 ${when(this.step != 2, () => 'text-neutral-500')}">
+          <div class="flex gap-2 ${when(this.lockStep != 3, () => 'text-neutral-500')}">
             <sl-icon
-              name="2-circle"
-              class="flex-none mt-1 ${when(this.step == 2, () => 'animate-pulse text-sky-500')}"
+              name="3-circle"
+              class="flex-none mt-1 ${when(this.lockStep == 3, () => 'animate-pulse text-sky-500')}"
               style="font-size: 1.1qrem;"
             ></sl-icon>
             <div class="flex-1">
@@ -308,10 +321,10 @@ OP_ENDIF
             </div>
           </div>
           <sl-divider></sl-divider>
-          <div class="flex gap-2 ${when(this.step != 3, () => 'text-neutral-500')}">
+          <div class="flex gap-2 ${when(this.lockStep != 4, () => 'text-neutral-500')}">
             <sl-icon
-              name="3-circle"
-              class="flex-none mt-1 ${when(this.step == 3, () => 'animate-pulse text-sky-500')}"
+              name="4-circle"
+              class="flex-none mt-1 ${when(this.lockStep == 4, () => 'animate-pulse text-sky-500')}"
               style="font-size: 1.1qrem;"
             ></sl-icon>
             <div class="flex-1">
@@ -337,8 +350,8 @@ OP_ENDIF
       toast(e)
       return
     }
-    this.step = 1
-    this.stepClosable = false
+    this.lockStep = 1
+    this.lockDialogClosable = false
     this.dialogStep.value?.show()
 
     var inscriptionFee = 0
@@ -346,51 +359,68 @@ OP_ENDIF
     walletState
       .updateNetwork()
       .then((network) =>
-        Promise.all([
-          network == 'devnet'
-            ? Promise.resolve({ minimumFee: 1, economyFee: 1, hourFee: 1 })
-            : fetch(walletState.mempoolApiUrl('/api/v1/fees/recommended')).then(getJson),
-          fetch('/api/lock', {
-            method: 'POST',
-            body: JSON.stringify({
-              address: this.address,
-              publicKey: this.publicKey,
-              mpcPubKey: this.mpcPubKey,
-              blocks: this.lockingBlocks,
-              ca: this.ca,
-              network
-            })
-          }).then(ensureSuccess)
-        ])
-      )
-      // calculate inscription fee
-      .then(([feeRates]) => {
-        inscriptionFee = Math.max(171 * feeRates.minimumFee, 86 * (feeRates.hourFee + feeRates.economyFee))
-      })
-      // create inscription, TBD: check if the inscription is already created
-      .then(() => walletState.connector!.sendBitcoin(p2tr.address!, amountInscription + inscriptionFee))
-      // reveal inscription
-      .then((txid) => {
-        console.log('inscribe transaction:', txid)
-        this.step = 2
-        const tx = new btc.Transaction()
-        tx.addInput({
-          ...p2tr,
-          txid,
-          index: 0,
-          witnessUtxo: { script: p2tr.script, amount: BigInt(amountInscription + inscriptionFee) }
-        })
-        tx.addOutputAddress(walletState.address!, BigInt(amountInscription), btcNetwork(walletState.network))
-        return walletState
-          .connector!.signPsbt(bytesToHex(tx.toPSBT()), {
-            toSignInputs: [{ index: 0, publicKey: this.publicKey, disableTweakSigner: true }]
+        // check if the inscription is already created
+        fetch(walletState.mempoolApiUrl(`/api/address/${lockAddress}`))
+          .then(getJson)
+          .then((result) => {
+            this.lockDialogHasInscription = result.chain_stats.funded_txo_sum || result.mempool_stats.spent_txo_sum
+            if (!this.lockDialogHasInscription) {
+              return (
+                Promise.all([
+                  network == 'devnet'
+                    ? Promise.resolve({ minimumFee: 1, economyFee: 1, hourFee: 1 })
+                    : fetch(walletState.mempoolApiUrl('/api/v1/fees/recommended')).then(getJson),
+                  fetch('/api/lock', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                      address: this.address,
+                      publicKey: this.publicKey,
+                      mpcPubKey: this.mpcPubKey,
+                      blocks: this.lockingBlocks,
+                      ca: this.ca,
+                      network
+                    })
+                  }).then(ensureSuccess)
+                ])
+                  // calculate inscription fee
+                  .then(([feeRates]) => {
+                    inscriptionFee = Math.max(171 * feeRates.minimumFee, 86 * (feeRates.hourFee + feeRates.economyFee))
+                  })
+                  // create inscription, TBD: check if the inscription is already created
+                  .then(() => {
+                    this.lockStep = 2
+                    return walletState.connector!.sendBitcoin(p2tr.address!, amountInscription + inscriptionFee)
+                  })
+                  // reveal inscription
+                  .then((txid) => {
+                    console.log('inscribe transaction:', txid)
+                    this.lockStep = 3
+                    const tx = new btc.Transaction()
+                    tx.addInput({
+                      ...p2tr,
+                      txid,
+                      index: 0,
+                      witnessUtxo: { script: p2tr.script, amount: BigInt(amountInscription + inscriptionFee) }
+                    })
+                    tx.addOutputAddress(
+                      walletState.address!,
+                      BigInt(amountInscription),
+                      btcNetwork(walletState.network)
+                    )
+                    return walletState
+                      .connector!.signPsbt(bytesToHex(tx.toPSBT()), {
+                        toSignInputs: [{ index: 0, publicKey: this.publicKey, disableTweakSigner: true }]
+                      })
+                      .then((psbt) => walletState.connector!.pushPsbt(psbt))
+                      .then((txid) => console.log('reveal transaction:', txid))
+                  })
+              )
+            } else return Promise.resolve()
           })
-          .then((psbt) => walletState.connector!.pushPsbt(psbt))
-      })
+      )
       // lock bitcoin
-      .then((txid) => {
-        this.step = 3
-        console.log('reveal transaction:', txid)
+      .then(() => {
+        this.lockStep = 4
         return walletState.connector!.sendBitcoin(lockAddress, amount * 1e8)
       })
       .then((txid) => {
@@ -413,8 +443,8 @@ OP_ENDIF
         this.dialogStep.value?.hide()
       })
       .catch((e) => {
-        this.stepError = e
-        this.stepClosable = true
+        this.lockDialogError = e
+        this.lockDialogClosable = true
       })
   }
 }
