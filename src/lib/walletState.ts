@@ -10,9 +10,15 @@ import { ContextProvider, createContext } from '@lit/context'
 
 export { StateController, type Unsubscribe } from '@lit-app/state'
 
+/**
+ * Contexts consumable.
+ * @see https://lit.dev/docs/data/context/#example
+ */
 export const walletContext = {
   address: createContext<string>('address'),
-  publicKey: createContext<string>('publicKey')
+  publicKey: createContext<string>('publicKey'),
+  network: createContext<string>('network'),
+  height: createContext<number>('height')
 }
 
 class WalletState extends State {
@@ -62,6 +68,7 @@ class WalletState extends State {
   }
 
   // ---- network ----
+  private networkProvider = new ContextProvider(document.body, { context: walletContext.network })
   @property() private _network?: Network
   /** connected network, subscribe with `_network` */
   public get network(): Network | undefined {
@@ -75,7 +82,7 @@ class WalletState extends State {
   public async updateNetwork(): Promise<Network> {
     return (this.promises['network'] ??= this.getConnector()
       .then((connector) => connector.network)
-      .then((network) => (this._network = network))
+      .then((network) => (this.networkProvider.setValue(network), (this._network = network)))
       .finally(() => delete this.promises['network']))
   }
   public switchNetwork(network: Network) {
@@ -126,6 +133,7 @@ class WalletState extends State {
   }
 
   // ---- height ----
+  private heightProvider = new ContextProvider(document.body, { context: walletContext.height })
   @property({ type: Object }) private _height?: number
   /** block height, subscribe with `_height` */
   public get height(): number | undefined {
@@ -136,7 +144,7 @@ class WalletState extends State {
   public async updateHeight(): Promise<number> {
     return (this.promises['height'] ??= fetch(this.mempoolApiUrl('/api/blocks/tip/height'))
       .then(getJson)
-      .then((height) => (this._height = height))
+      .then((height) => (this.heightProvider.setValue(height), (this._height = height)))
       .finally(() => delete this.promises['height']))
   }
 
@@ -201,15 +209,8 @@ class WalletState extends State {
 }
 
 /**
- * Properties in {walletState} can be fetched via public `getter` and async
- * `getXXX`. Can also be forced to update via async `updateXXX` and subscribed
- * with `_XXX` for updates if defined with private `@property`.
- * @example
- * // string | undefined
- * const address = walletState.address
- * // Promise<string>
- * const address = await walletState.getAddress()
- * // subscription
- * walletState.subscribe(callback, "_address")
+ * Properties in {@link WalletState} can be fetched via public `getter` and async
+ * `getXXX`. Can also be forced to update via async `updateXXX`.
+ * @see {@link walletContext} for subscribing
  */
 export const walletState = new WalletState()

@@ -2,7 +2,7 @@ import { bytes } from '@scure/base'
 import { toXOnlyU8 } from './utils.js'
 import { Script } from '@scure/btc-signer'
 
-export function scriptLock(mpcKey: Uint8Array, userKey: Uint8Array, coinAddress: string, blocks = 10): Uint8Array {
+export function scriptLockV0(mpcKey: Uint8Array, userKey: Uint8Array, coinAddress: string, blocks = 10): Uint8Array {
   if (!userKey.length) throw new Error('user key is empty')
   if (!mpcKey.length) throw new Error('mpc key is empty')
   return Script.encode([
@@ -19,6 +19,21 @@ export function scriptLock(mpcKey: Uint8Array, userKey: Uint8Array, coinAddress:
     toXOnlyU8(userKey), // check user key
     'CHECKSIG', // fail if signature does not match
     'OP_0',
+    'IF',
+    bytes('base58', coinAddress),
+    'ENDIF'
+  ])
+}
+
+export function scriptLock(userKey: Uint8Array, coinAddress: string, blocks = 10): Uint8Array {
+  if (!userKey.length) throw new Error('user key is empty')
+  return Script.encode([
+    blocks, // nubmer of blocks to lock
+    'CHECKSEQUENCEVERIFY', // fail if block not passes
+    'DROP', // drop check result
+    toXOnlyU8(userKey), // check user key
+    'CHECKSIG', // fail if signature does not match
+    'OP_0', // Skip next if test
     'IF',
     bytes('base58', coinAddress),
     'ENDIF'

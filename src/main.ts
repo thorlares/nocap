@@ -168,8 +168,8 @@ export class AppMain extends LitElement {
       <main class="flex flex-col gap-10 justify-center h-[calc(100vh-8rem)]">
         <div class="flex flex-col items-center w-full">
           <span
-            class="inline-flex whitespace-nowrap font-medium ring-offset-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 text-2xl text-slate-50"
-            >[back your meme!]</span
+            class="inline-flex items-center  whitespace-nowrap font-medium ring-offset-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 text-2xl text-slate-50"
+            >[REAL <sl-icon outline name="currency-bitcoin" class="text-4xl"></sl-icon> backing your meme!]</span
           >
         </div>
         <div class="flex justify-center">
