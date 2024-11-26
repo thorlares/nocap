@@ -12,8 +12,8 @@ export function POST(request: Request) {
   return request
     .json()
     .then((params) => {
-      const { publicKey, mpcPubKey, blocks, ca, network } = params
-      const lockAddress = getLockAddress(mpcPubKey, publicKey, ca, blocks, network)
+      const { publicKey, blocks, ca, network } = params
+      const lockAddress = getLockAddress(publicKey, ca, blocks, network)
       return fetch(mempoolApiUrl(`/api/address/${lockAddress}`, network))
         .then(getJson)
         .then((result) => {
@@ -26,7 +26,8 @@ export function POST(request: Request) {
               ca,
               lock_address: lockAddress,
               confirmed,
-              unconfirmed
+              unconfirmed,
+              last_update: new Date()
             })
             .onConflict((oc) => oc.column('ca').column('lock_address').doUpdateSet({ confirmed, unconfirmed }))
             .execute()

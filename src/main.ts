@@ -185,6 +185,7 @@ export class AppMain extends LitElement {
               class="flex h-10 rounded-md text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 p-2 border border-gray-300 w-full bg-green-300 text-black border-none focus:border-none active:border-none"
               id="search-token"
               placeholder="enter coin address"
+              tabindex="1"
               autocomplete="search-token"
               aria-label="Search for token"
               enterkeyhint="search"

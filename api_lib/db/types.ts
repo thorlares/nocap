@@ -299,6 +299,7 @@ export interface ExtensionsPgStatStatementsInfo {
 export interface LockedAmounts {
   ca: string;
   confirmed: number | null;
+  last_update: Timestamp | null;
   lock_address: string;
   unconfirmed: number | null;
 }
@@ -306,6 +307,7 @@ export interface LockedAmounts {
 export interface LockedAmountsTestnet {
   ca: string;
   confirmed: number | null;
+  last_update: Timestamp | null;
   lock_address: string;
   unconfirmed: number | null;
 }

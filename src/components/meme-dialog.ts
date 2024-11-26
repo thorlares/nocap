@@ -282,6 +282,7 @@ export class MemeDialog extends LitElement {
                     name="amount"
                     class="w-full"
                     placeholder="Enter an amount of bitcoin"
+                    tabindex="1"
                     ?disabled=${!this.publicKey}
                   ></sl-input>
                   ${when(
@@ -343,14 +344,19 @@ OP_ENDIF
                     ${when(
                       utxo.status.confirmed,
                       () =>
-                        html`since block ${utxo.status.block_height}
-                        ${when(
+                        when(
                           this.height &&
                             this.lockAddresses[utxo.address as string] &&
                             utxo.status.block_height + this.lockAddresses[utxo.address].blocks > this.height,
-                          () => html`<sl-icon class="text-green-400" outline name="lock"></sl-icon>`,
-                          () => html`<sl-icon class="text-rose-400" outline name="unlock"></sl-icon>`
-                        )}`,
+                          () =>
+                            html`<sl-icon name="clock-history"></sl-icon> ${utxo.status.block_height +
+                              this.lockAddresses[utxo.address].blocks -
+                              this.height!}
+                              blocks remaining`,
+                          () =>
+                            html`<sl-icon class="text-green-400" name="calendar-check"></sl-icon
+                              ><sl-icon name="calendar-minus"></sl-icon>`
+                        ),
                       () => '(unconfirmed)'
                     )}
                   </p>`
@@ -407,7 +413,7 @@ OP_ENDIF
           <sl-divider></sl-divider>
           <div class="flex gap-2 ${when(this.lockDialogStep != 1, () => 'text-neutral-500')}">
             <sl-icon
-              name="1-circle"
+              .name=${this.lockDialogStep == 1 ? 'circle' : this.lockDialogHasInscription ? 'check-circle' : 'x-circle'}
               class="flex-none mt-1 ${when(this.lockDialogStep == 1, () => 'animate-pulse text-sky-500')}"
               style="font-size: 1.1qrem;"
             ></sl-icon>
@@ -420,24 +426,31 @@ OP_ENDIF
           <sl-divider></sl-divider>
           <div class="flex gap-2 ${when(this.lockDialogStep != 2, () => 'text-neutral-500')}">
             <sl-icon
-              name="2-circle"
+              name="1-circle"
               class="flex-none mt-1 ${when(this.lockDialogStep == 2, () => 'animate-pulse text-sky-500')}"
               style="font-size: 1.1qrem;"
             ></sl-icon>
             <div class="flex-1">
               <p>
-                Creating an inscription to store information in locking script. Data stored:
-                <span class="font-mono break-all text-xs bg-[var(--sl-color-neutral-200)]">
-                  ${this.publicKey}&lt;YourPublicKey&gt;|${this.mpcPubKey}&lt;MPCPublicKey&gt;|${this
-                    .lockingBlocks}&lt;Blocks&gt;|${this.ca}&lt;CoinAddress&gt;</span
-                >
+                Creating an inscription to store information in locking
+                script.${when(
+                  this.lockDialogStep == 2,
+                  () => html`<br />Data stored:
+                    <span class="font-mono break-all text-xs bg-[var(--sl-color-neutral-200)]">
+                      v1&lt;version&gt;|${this.publicKey}&lt;YourPublicKey&gt;|${this
+                        .lockingBlocks}&lt;Blocks&gt;|${this.ca}&lt;CoinAddress&gt;</span
+                    ><br />Inscription address:
+                    <span class="font-mono text-xs break-all bg-[var(--sl-color-neutral-200)]"
+                      >${this.p2trInscription?.address}</span
+                    >`
+                )}
               </p>
             </div>
           </div>
           <sl-divider></sl-divider>
           <div class="flex gap-2 ${when(this.lockDialogStep != 3, () => 'text-neutral-500')}">
             <sl-icon
-              name="3-circle"
+              name="2-circle"
               class="flex-none mt-1 ${when(this.lockDialogStep == 3, () => 'animate-pulse text-sky-500')}"
               style="font-size: 1.1qrem;"
             ></sl-icon>
@@ -451,7 +464,7 @@ OP_ENDIF
           <sl-divider></sl-divider>
           <div class="flex gap-2 ${when(this.lockDialogStep != 4, () => 'text-neutral-500')}">
             <sl-icon
-              name="4-circle"
+              name="3-circle"
               class="flex-none mt-1 ${when(this.lockDialogStep == 4, () => 'animate-pulse text-sky-500')}"
               style="font-size: 1.1qrem;"
             ></sl-icon>
@@ -480,6 +493,7 @@ OP_ENDIF
     }
     this.lockDialogStep = 1
     this.lockDialogClosable = false
+    this.lockDialogError = undefined
     this.dialogStep.value?.show()
 
     var inscriptionFee = 0
@@ -503,7 +517,6 @@ OP_ENDIF
                     body: JSON.stringify({
                       address: this.address,
                       publicKey: this.publicKey,
-                      mpcPubKey: this.mpcPubKey,
                       blocks: this.lockingBlocks,
                       ca: this.ca,
                       network
@@ -558,7 +571,6 @@ OP_ENDIF
           body: JSON.stringify({
             address: this.address,
             publicKey: this.publicKey,
-            mpcPubKey: this.mpcPubKey,
             blocks: this.lockingBlocks,
             ca: this.ca,
             network: walletState.network
