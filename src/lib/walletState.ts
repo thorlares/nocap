@@ -6,7 +6,8 @@ import { Leather } from './wallets/leather'
 import { WalletStandard } from './wallets/walletStandard'
 import { getJson } from '../../lib/fetch'
 import { mempoolApiUrl } from '../../lib/utils'
-import { ContextProvider, createContext } from '@lit/context'
+import { ContextConsumer, ContextProvider, createContext } from '@lit/context'
+import { LitElement } from 'lit'
 
 export { StateController, type Unsubscribe } from '@lit-app/state'
 
@@ -15,10 +16,10 @@ export { StateController, type Unsubscribe } from '@lit-app/state'
  * @see https://lit.dev/docs/data/context/#example
  */
 export const walletContext = {
-  address: createContext<string>('address'),
-  publicKey: createContext<string>('publicKey'),
-  network: createContext<string>('network'),
-  height: createContext<number>('height')
+  address: createContext<string | undefined>('address'),
+  publicKey: createContext<string | undefined>('publicKey'),
+  network: createContext<string | undefined>('network'),
+  height: createContext<number | undefined>('height')
 }
 
 class WalletState extends State {
@@ -54,16 +55,22 @@ class WalletState extends State {
       .finally(() => delete this.promises['address']))
   }
 
+  public requestAccount(): Promise<string> {
+    return this.getConnector()
+      .then((connector) => connector.requestAccounts())
+      .then((accounts) => (this.addressProvider.setValue(accounts[0]), (this._address = accounts[0])))
+  }
+
   protected onAccountChanged = (accounts: string[]) => {
+    console.debug('Got onAccountChanged event with accounts', accounts)
     this.reset(false)
     if (accounts) {
       this._address = accounts[0]
       this.addressProvider.setValue(accounts[0])
-      this.publicKeyProvider.setValue('')
       this.updatePublicKey()
     } else {
-      this.addressProvider.setValue('')
-      this.publicKeyProvider.setValue('')
+      this.addressProvider.setValue(undefined)
+      this.publicKeyProvider.setValue(undefined)
     }
   }
 
@@ -103,6 +110,7 @@ class WalletState extends State {
   }
 
   public async updatePublicKey(): Promise<string> {
+    this.getAddress() // make sure we have an address
     return (this.promises['publicKey'] ??= this.getConnector()
       .then((connector) => connector.publicKey)
       .then((pubKey) => (this.publicKeyProvider.setValue(pubKey), (this._publicKey = pubKey)))
@@ -149,7 +157,7 @@ class WalletState extends State {
   }
 
   // --- wallet connector ----
-  private _connector?: Wallet
+  @property({ skipReset: true }) private _connector?: Wallet
   get connector(): Wallet | undefined {
     if (!this._connector && this.wallet) this.useWallet(this.wallet)
 
@@ -160,12 +168,16 @@ class WalletState extends State {
     return (
       this.connector ??
       (this.promises['connector'] ??= new Promise<Wallet>((resolve) => {
-        this.subscribe((_, v) => {
-          if (v) {
-            resolve(v)
-            delete this.promises['connector']
-          }
-        }, '_connector')
+        this.subscribe(
+          (_, v) => {
+            if (v) {
+              resolve(v)
+              delete this.promises['connector']
+            }
+          },
+          '_connector',
+          { once: true }
+        )
       }))
     )
   }
@@ -191,6 +203,7 @@ class WalletState extends State {
 
   reset(resetConnectorAndAddress = true): void {
     super.reset()
+    // properties without resetValue are not reset in super class, we need to reset them to undefined
     ;[...this.propertyMap]
       // @ts-ignore
       .filter(([key, definition]) => definition.skipReset !== true && definition.resetValue === undefined)
@@ -202,9 +215,9 @@ class WalletState extends State {
       if (this._connector?.installed) this._connector.removeListener('accountsChanged', this.onAccountChanged)
       this._connector = undefined
       this._address = undefined
-      this.addressProvider.setValue('')
-      this.publicKeyProvider.setValue('')
+      this.addressProvider.setValue(undefined)
     }
+    this.publicKeyProvider.setValue(undefined)
   }
 }
 
@@ -214,3 +227,29 @@ class WalletState extends State {
  * @see {@link walletContext} for subscribing
  */
 export const walletState = new WalletState()
+
+if (import.meta.env.MODE === 'development') {
+  console.debug('subscribe wallet contexts for debugging')
+
+  class DebugContextConsumer extends LitElement {
+    private contextConsumers: any[] = []
+    connectedCallback(): void {
+      super.connectedCallback()
+      Object.entries(walletContext).forEach(([key, value]) => {
+        console.debug('subscribe', key)
+        this.contextConsumers.push(
+          new ContextConsumer(this, {
+            context: value,
+            callback: (v) => console.debug(key, 'changed to', v),
+            subscribe: true
+          })
+        )
+      })
+    }
+  }
+
+  customElements.define('debug-context-consumer', DebugContextConsumer)
+
+  const container = document.createElement('debug-context-consumer')
+  document.body.append(container)
+}

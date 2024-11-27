@@ -69,7 +69,6 @@ export class MemeDialog extends LitElement {
 
   connectedCallback(): void {
     super.connectedCallback()
-    // @todo: unsubscribe when changed
     this.contextConsumers.push(
       new ContextConsumer(this, {
         context: walletContext.network,
@@ -433,7 +432,9 @@ OP_ENDIF
           ?closable=${this.lockDialogClosable}
           open
           class="[&::part(close-button)]:items-start [&::part(close-button)]:mt-3"
-          @sl-hide=${() => this.dialogStep.value?.hide()}
+          @sl-after-hide=${(e: CustomEvent) => (
+            (e.currentTarget as HTMLElement).setAttribute('open', 'true'), this.dialogStep.value?.hide()
+          )}
         >
           ${when(
             this.lockDialogError,
@@ -717,7 +718,9 @@ OP_ENDIF
             .catch(console.warn)
           this.updateLockDetails()
           toastImportant(
-            `Successfully unlocked ${utxo.value} BTC to <span class="font-mono break-all">${walletState.address}</span>`
+            `Successfully unlocked ${formatUnits(utxo.value, 8)} BTC to <span class="font-mono break-all">${
+              walletState.address
+            }</span>`
           )
         })
         .catch((e) => {
