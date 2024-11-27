@@ -24,8 +24,11 @@ import { btcNetwork } from '../../lib/network'
 import { toXOnlyU8 } from '../../lib/utils'
 import { ensureSuccess, getJson } from '../../lib/fetch'
 import { toast, toastImportant } from './toast'
-import { getLockAddress, getLockAddressV0 } from '../../lib/lockAddress'
+import { getLockAddress, getLockAddressV0, getLockP2WSH, getLockP2WSHV0 } from '../../lib/lockAddress'
 import { formatUnits } from '@ethersproject/units'
+import { networks, payments, Psbt, script } from 'bitcoinjs-lib'
+import { bytes } from '@scure/base'
+import { witnessStackToScriptWitness } from '../lib/witnessStackToScriptWitness'
 
 @customElement('meme-dialog')
 export class MemeDialog extends LitElement {
@@ -132,11 +135,12 @@ export class MemeDialog extends LitElement {
         getLockAddressV0(this.mpcPubKey, this.publicKey, ca, this.lockingBlocks, walletState.network!),
         getLockAddress(this.publicKey, ca, this.lockingBlocks, walletState.network!)
       ].forEach((lockAddress) => {
-        fetch(`/api/lockAddress?address=${lockAddress}`)
-          .then(getJson)
-          .then((result) => {
-            if (ca == this.ca) this.lockAddresses = { ...this.lockAddresses, [lockAddress]: result }
-          })
+        if (!this.lockAddresses[lockAddress])
+          fetch(`/api/lockAddress?address=${lockAddress}`)
+            .then(getJson)
+            .then((result) => {
+              if (ca == this.ca) this.lockAddresses = { ...this.lockAddresses, [lockAddress]: result }
+            })
         fetch(walletState.mempoolApiUrl(`/api/address/${lockAddress}/utxo`))
           .then(getJson)
           .then((lockedUtxos) => {
@@ -252,7 +256,7 @@ export class MemeDialog extends LitElement {
               <sl-tab slot="nav" panel="support">Top Supporters</sl-tab>
               <sl-tab-panel name="support" class="text-gray-400 text-xs">
                 ${map(this.supporters, (supporter) => {
-                  return html`<p class="break-all">
+                  return html`<p class="font-mono">
                     <a
                       target="_blank"
                       href="${walletState.mempoolUrl}/address/${supporter.lock_address}"
@@ -334,28 +338,37 @@ OP_ENDIF
               <sl-tab-panel name="unlock" class="text-gray-400 text-xs">
                 ${map(
                   this.lockedUtxos,
-                  (utxo) => html`<p class="font-mono break-all">
-                    <a
-                      target="_blank"
-                      href="${walletState.mempoolUrl}/tx/${utxo.txid}"
-                      class="underline hover:no-underline"
-                      >${utxo.txid.slice(0, 8) + '...' + utxo.txid.slice(-6)}</a
-                    >: ${formatUnits(utxo.value, 8)}
+                  (utxo) => html`<p class="flex items-center gap-1">
+                    <span class="font-mono"
+                      ><a
+                        target="_blank"
+                        href="${walletState.mempoolUrl}/tx/${utxo.txid}"
+                        class="underline hover:no-underline"
+                        >${utxo.txid.slice(0, 5) + '...' + utxo.txid.slice(-5)}</a
+                      >: ${formatUnits(utxo.value, 8)}</span
+                    >
                     ${when(
                       utxo.status.confirmed,
                       () =>
                         when(
-                          this.height &&
-                            this.lockAddresses[utxo.address as string] &&
-                            utxo.status.block_height + this.lockAddresses[utxo.address].blocks > this.height,
+                          this.height && this.lockAddresses[utxo.address as string],
                           () =>
-                            html`<sl-icon name="clock-history"></sl-icon> ${utxo.status.block_height +
-                              this.lockAddresses[utxo.address].blocks -
-                              this.height!}
-                              blocks remaining`,
-                          () =>
-                            html`<sl-icon class="text-green-400" name="calendar-check"></sl-icon
-                              ><sl-icon name="calendar-minus"></sl-icon>`
+                            when(
+                              utxo.status.block_height + this.lockAddresses[utxo.address].blocks > this.height!,
+                              () =>
+                                html`<sl-icon name="clock-history"></sl-icon>
+                                  <span
+                                    >${utxo.status.block_height +
+                                    this.lockAddresses[utxo.address].blocks -
+                                    this.height!}
+                                    blocks remaining</span
+                                  >`,
+                              () =>
+                                html`<sl-button @click=${() => this.unlock(utxo)} variant="text" size="small"
+                                  >[unlock]</sl-button
+                                >`
+                            ),
+                          () => html`<sl-spinner></sl-spinner>`
                         ),
                       () => '(unconfirmed)'
                     )}
@@ -501,13 +514,14 @@ OP_ENDIF
     walletState
       .updateNetwork()
       .then((network) =>
-        // check if the inscription is already created
-        fetch(walletState.mempoolApiUrl(`/api/address/${lockAddress}`))
+        // Step 1: check if the inscription is already created
+        fetch(walletState.mempoolApiUrl(`/api/address/${p2tr.address}`))
           .then(getJson)
           .then((result) => {
             this.lockDialogHasInscription = result.chain_stats.funded_txo_sum || result.mempool_stats.spent_txo_sum
             if (!this.lockDialogHasInscription) {
               return (
+                // get recommended fees and post lock info to server
                 Promise.all([
                   network == 'devnet'
                     ? Promise.resolve({ minimumFee: 1, economyFee: 1, hourFee: 1 })
@@ -527,12 +541,12 @@ OP_ENDIF
                   .then(([feeRates]) => {
                     inscriptionFee = Math.max(171 * feeRates.minimumFee, 86 * (feeRates.hourFee + feeRates.economyFee))
                   })
-                  // create inscription, TBD: check if the inscription is already created
+                  // Step 2: create inscription
                   .then(() => {
                     this.lockDialogStep = 2
                     return walletState.connector!.sendBitcoin(p2tr.address!, amountInscription + inscriptionFee)
                   })
-                  // reveal inscription
+                  // Step 3: reveal inscription
                   .then((txid) => {
                     console.log('inscribe transaction:', txid)
                     this.lockDialogStep = 3
@@ -559,13 +573,14 @@ OP_ENDIF
             } else return Promise.resolve()
           })
       )
-      // lock bitcoin
+      // Step 4: lock bitcoin
       .then(() => {
         this.lockDialogStep = 4
         return walletState.connector!.sendBitcoin(lockAddress, amount * 1e8)
       })
       .then((txid) => {
         console.log('lock transaction:', txid)
+        // update locked amount on server
         fetch('/api/updateAmount', {
           method: 'POST',
           body: JSON.stringify({
@@ -585,7 +600,116 @@ OP_ENDIF
       .catch((e) => {
         this.lockDialogError = e
         this.lockDialogClosable = true
+        console.info(e)
       })
+  }
+
+  private async unlock(utxo: any) {
+    const addressParams = this.lockAddresses[utxo.address]
+
+    // try recover p2wsh
+    var p2wsh = getLockP2WSH(addressParams.publicKey, addressParams.ca, addressParams.blocks, walletState.network!)
+    if (p2wsh.address != utxo.address) {
+      if (addressParams.mpcPubKey) {
+        const p2wshV0 = getLockP2WSHV0(
+          addressParams.mpcPubKey,
+          addressParams.publicKey,
+          addressParams.ca,
+          addressParams.blocks,
+          walletState.network!
+        )
+        if (p2wshV0.address != utxo.address) {
+          toast(
+            new Error(`lock addresses mismatch got ${p2wsh.address} and ${p2wshV0.address} should be ${utxo.address}`)
+          )
+          return
+        }
+        p2wsh = p2wshV0
+      } else {
+        toast(new Error(`lock address mismatch got ${p2wsh.address} should be ${utxo.address}`))
+        return
+      }
+    }
+    // fetch recommended fees
+    ;(walletState.network == 'devnet'
+      ? Promise.resolve({ minimumFee: 1, economyFee: 1, hourFee: 1 })
+      : fetch(walletState.mempoolApiUrl('/api/v1/fees/recommended')).then(getJson)
+    ).then((feeRates) => {
+      const fee = Math.max(175 * feeRates.minimumFee, 60 * (feeRates.hourFee + feeRates.economyFee))
+      const network =
+        walletState.network == 'livenet'
+          ? networks.bitcoin
+          : walletState.network == 'devnet'
+          ? networks.regtest
+          : networks.testnet
+
+      // build transaction
+      const psbt = new Psbt({ network })
+      psbt.addInput({
+        hash: utxo.txid,
+        index: utxo.vout,
+        sequence: addressParams.blocks,
+        witnessUtxo: {
+          script: p2wsh.script,
+          value: BigInt(utxo.value)
+        },
+        witnessScript: p2wsh.witnessScript
+      })
+      psbt.addOutput({
+        address: walletState.address!,
+        value: BigInt(utxo.value - fee)
+      })
+
+      // we need to finalize the input manually due to custom p2wsh script
+      const finalizeInput = (_inputIndex: number, input: any) => {
+        const redeemPayment = payments.p2wsh({
+          redeem: {
+            input: script.compile([input.partialSig[0].signature]),
+            output: input.witnessScript
+          }
+        })
+
+        const finalScriptWitness = witnessStackToScriptWitness(redeemPayment.witness ?? [])
+
+        return {
+          finalScriptSig: bytes('utf8', ''),
+          finalScriptWitness
+        }
+      }
+
+      return walletState
+        .connector!.signPsbt(psbt.toHex(), {
+          autoFinalized: false, // we need to finalize the input manually later
+          toSignInputs: [{ index: 0, publicKey: this.publicKey, disableTweakSigner: true }]
+        })
+        .then((psbtHex) => Psbt.fromHex(psbtHex, { network }).finalizeInput(0, finalizeInput).toHex())
+        .then((txHex) => (console.log(txHex), txHex))
+        .then((txHex) => walletState.connector!.pushPsbt(txHex))
+        .then((txid) => {
+          console.log('unlock transaction:', txid)
+          //  update locked amount on server
+          fetch('/api/updateAmount', {
+            method: 'POST',
+            body: JSON.stringify({
+              address: this.address,
+              publicKey: this.publicKey,
+              blocks: this.lockingBlocks,
+              ca: this.ca,
+              network: walletState.network
+            })
+          })
+            .then(ensureSuccess)
+            .catch(console.warn)
+          this.updateLockDetails()
+          toastImportant(
+            `Successfully unlocked ${utxo.value} BTC to <span class="font-mono break-all">${walletState.address}</span>`
+          )
+        })
+        .catch((e) => {
+          if (e?.message.includes('non-BIP68-final')) toast(new Error(`${e.message}, timelock not passed`))
+          else toast(e)
+        })
+    })
   }
 }
 

@@ -25,6 +25,9 @@ export function toastImportant(message: any, options?: ToastOptions) {
 
 export function toast(message: any, options?: ToastOptions) {
   const isError = message instanceof Error
+  try {
+    console.info(isError ? 'toasting error:' : 'toasting', message?.message, message)
+  } catch (e) {}
   const alert: SlAlert = Object.assign(document.createElement('sl-alert'), {
     duration: 3500,
     countdown: options?.duration ? undefined : 'rtl',

@@ -56,6 +56,9 @@ importers:
       bitcoin-address-validation:
         specifier: ^2.2.3
         version: 2.2.3
+      bitcoinjs-lib:
+        specifier: 7.0.0-rc.0
+        version: 7.0.0-rc.0(typescript@5.6.3)
       kysely:
         specifier: ^0.27.4
         version: 0.27.4
@@ -68,6 +71,9 @@ importers:
       sats-connect-v1:
         specifier: npm:sats-connect@1.0.0
         version: sats-connect@1.0.0
+      varuint-bitcoin:
+        specifier: ^2.0.0
+        version: 2.0.0
     devDependencies:
       '@types/node':
         specifier: ^22.9.1
@@ -751,12 +757,20 @@ packages:
   bindings@1.5.0:
     resolution: {integrity: sha512-p2q/t/mhvuOj/UeLlV6566GD/guowlr0hHxClI0W9m7MWYkL1F0hLo+0Aexs9HSPCtR1SXQ0TD3MMKrXZajbiQ==}
 
+  bip174@3.0.0-rc.1:
+    resolution: {integrity: sha512-+8P3BpSairVNF2Nee6Ksdc1etIjWjBOi/MH0MwKtq9YaYp+S2Hk2uvup0e8hCT4IKlS58nXJyyQVmW92zPoD4Q==}
+    engines: {node: '>=18.0.0'}
+
   bip32@5.0.0-rc.0:
     resolution: {integrity: sha512-5hVFGrdCnF8GB1Lj2eEo4PRE7+jp+3xBLnfNjydivOkMvKmUKeJ9GG8uOy8prmWl3Oh154uzgfudR1FRkNBudA==}
     engines: {node: '>=18.0.0'}
 
   bitcoin-address-validation@2.2.3:
     resolution: {integrity: sha512-1uGCGl26Ye8JG5qcExtFLQfuib6qEZWNDo1ZlLlwp/z7ygUFby3IxolgEfgMGaC+LG9csbVASLcH8fRLv7DIOg==}
+
+  bitcoinjs-lib@7.0.0-rc.0:
+    resolution: {integrity: sha512-7CQgOIbREemKR/NT2uc3uO/fkEy+6CM0sLxboVVY6bv6DbZmPt3gg5Y/hhWgQFeZu5lfTbtVAv32MIxf7lMh4g==}
+    engines: {node: '>=18.0.0'}
 
   bn.js@5.2.1:
     resolution: {integrity: sha512-eXRvHzWyYPBuB4NBy0cmYQjGitUrtqwbvlzP3G6VFnNRbsZQIxQ10PbKKHt8gZ/HW/D/747aDl+QkDqg3KQLMQ==}
@@ -2091,6 +2105,10 @@ packages:
     resolution: {integrity: sha512-xS6+s8e0Xbx++5/0L+yyexukU7pz//Yg6IHg3BKhXotg1JcYtgxVcUctQ0HxLByiJzpAkNFawz1Nz5Xadzo82g==}
     engines: {node: '>=14.0.0'}
 
+  uint8array-tools@0.0.9:
+    resolution: {integrity: sha512-9vqDWmoSXOoi+K14zNaf6LBV51Q8MayF0/IiQs3GlygIKUYtog603e6virExkjjFosfJUBI4LhbQK1iq8IG11A==}
+    engines: {node: '>=14.0.0'}
+
   undici-types@6.19.8:
     resolution: {integrity: sha512-ve2KP6f/JnbPBFyobGHuerC9g1FYGn/F8n1LWTwNxCEzd6IfqTwUQcNXgEtmmQ6DlRrC1hrSrBnCZPokRrDHjw==}
 
@@ -2140,6 +2158,17 @@ packages:
     peerDependenciesMeta:
       typescript:
         optional: true
+
+  valibot@0.38.0:
+    resolution: {integrity: sha512-RCJa0fetnzp+h+KN9BdgYOgtsMAG9bfoJ9JSjIhFHobKWVWyzM3jjaeNTdpFK9tQtf3q1sguXeERJ/LcmdFE7w==}
+    peerDependencies:
+      typescript: '>=5'
+    peerDependenciesMeta:
+      typescript:
+        optional: true
+
+  varuint-bitcoin@2.0.0:
+    resolution: {integrity: sha512-6QZbU/rHO2ZQYpWFDALCDSRsXbAs1VOEmXAxtbtjLtKuMJ/FQ8YbhfxlaiKv5nklci0M6lZtlZyxo9Q+qNnyog==}
 
   vercel@39.1.0:
     resolution: {integrity: sha512-ipUI6iJ5PNFRMjb6LmXBNVzzCi9RAmr91Vli8+8324+ApiGRakzAuwwefRNjhS8CVi5glp2cIB03kXDaWTHaXw==}
@@ -2910,6 +2939,11 @@ snapshots:
     dependencies:
       file-uri-to-path: 1.0.0
 
+  bip174@3.0.0-rc.1:
+    dependencies:
+      uint8array-tools: 0.0.9
+      varuint-bitcoin: 2.0.0
+
   bip32@5.0.0-rc.0(typescript@5.6.3):
     dependencies:
       '@noble/hashes': 1.5.0
@@ -2925,6 +2959,18 @@ snapshots:
       base58-js: 1.0.5
       bech32: 2.0.0
       sha256-uint8array: 0.10.7
+
+  bitcoinjs-lib@7.0.0-rc.0(typescript@5.6.3):
+    dependencies:
+      '@noble/hashes': 1.5.0
+      bech32: 2.0.0
+      bip174: 3.0.0-rc.1
+      bs58check: 4.0.0
+      uint8array-tools: 0.0.9
+      valibot: 0.38.0(typescript@5.6.3)
+      varuint-bitcoin: 2.0.0
+    transitivePeerDependencies:
+      - typescript
 
   bn.js@5.2.1: {}
 
@@ -4198,6 +4244,8 @@ snapshots:
 
   uint8array-tools@0.0.8: {}
 
+  uint8array-tools@0.0.9: {}
+
   undici-types@6.19.8: {}
 
   undici@5.28.4:
@@ -4237,6 +4285,14 @@ snapshots:
   valibot@0.37.0(typescript@5.6.3):
     optionalDependencies:
       typescript: 5.6.3
+
+  valibot@0.38.0(typescript@5.6.3):
+    optionalDependencies:
+      typescript: 5.6.3
+
+  varuint-bitcoin@2.0.0:
+    dependencies:
+      uint8array-tools: 0.0.8
 
   vercel@39.1.0:
     dependencies:

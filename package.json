@@ -32,10 +32,12 @@
     "@wallet-standard/base": "^1.1.0",
     "bip32": "5.0.0-rc.0",
     "bitcoin-address-validation": "^2.2.3",
+    "bitcoinjs-lib": "7.0.0-rc.0",
     "kysely": "^0.27.4",
     "lit": "^3.2.1",
     "pg": "^8.13.1",
-    "sats-connect-v1": "npm:sats-connect@1.0.0"
+    "sats-connect-v1": "npm:sats-connect@1.0.0",
+    "varuint-bitcoin": "^2.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.9.1",

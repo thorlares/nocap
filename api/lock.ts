@@ -11,7 +11,7 @@ export function POST(request: Request) {
         kv
           .multi()
           // store params for a lock address
-          .hsetnx(`nc:lock:addresses`, lockAddress, params)
+          .hsetnx(`nc:lock:addresses`, lockAddress, { version: 1, ...params })
           // store addresses that locks for a coin
           .sadd(network == 'livenet' ? `nc:ca:${ca}:lockers` : `nc:ca:${ca}:lockers:testnet`, `${address}`)
           // store coins that an address locks
