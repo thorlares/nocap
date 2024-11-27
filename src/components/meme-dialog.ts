@@ -4,6 +4,7 @@ import '@shoelace-style/shoelace/dist/components/dialog/dialog.js'
 import '@shoelace-style/shoelace/dist/components/divider/divider.js'
 import '@shoelace-style/shoelace/dist/components/icon/icon.js'
 import '@shoelace-style/shoelace/dist/components/input/input.js'
+import '@shoelace-style/shoelace/dist/components/skeleton/skeleton.js'
 import '@shoelace-style/shoelace/dist/components/spinner/spinner.js'
 import '@shoelace-style/shoelace/dist/components/tab/tab.js'
 import '@shoelace-style/shoelace/dist/components/tab-group/tab-group.js'
@@ -75,16 +76,14 @@ export class MemeDialog extends LitElement {
         callback: () => this.updateLockDetails(),
         subscribe: true
       }),
-      new ContextConsumer(this, {
-        context: mpcPubKey,
-        callback: () => this.updateLockUtxos(),
-        subscribe: true
-      }),
-      new ContextConsumer(this, {
-        context: walletContext.publicKey,
-        callback: () => this.updateLockUtxos(),
-        subscribe: true
-      })
+      ...[walletContext.address, walletContext.publicKey, mpcPubKey].map(
+        (context) =>
+          new ContextConsumer(this, {
+            context,
+            callback: () => this.updateLockUtxos(),
+            subscribe: true
+          })
+      )
     )
   }
 
@@ -98,7 +97,7 @@ export class MemeDialog extends LitElement {
     this.dialog.value?.show()
     if (!this.publicKey) walletState.getPublicKey()
     if (this.meta?.id != this.ca) {
-      this.meta = this.supporters = this.lockedAmount = this.lockedUtxos = undefined
+      this.meta = undefined
       // update meta
       fetch(`/api/token?address=${this.ca}`)
         .then(getJson)
@@ -114,7 +113,7 @@ export class MemeDialog extends LitElement {
     this.dialog.value?.hide()
   }
 
-  updateLockUtxos() {
+  private updateLockUtxos() {
     try {
       if (!this.dialog.value?.open) return
       if (!this.network) {
@@ -131,6 +130,9 @@ export class MemeDialog extends LitElement {
       }
       walletState.updateHeight()
       const ca = this.ca!
+
+      this.lockedUtxos = undefined
+      // update my locked utxos
       ;[
         getLockAddressV0(this.mpcPubKey, this.publicKey, ca, this.lockingBlocks, walletState.network!),
         getLockAddress(this.publicKey, ca, this.lockingBlocks, walletState.network!)
@@ -157,14 +159,31 @@ export class MemeDialog extends LitElement {
     }
   }
 
-  updateLockDetails() {
+  private async updateLockDetails() {
     try {
       if (!this.dialog.value?.open) return
+      this.supporters = this.lockedAmount = this.lockedUtxos = undefined
       if (!this.network) {
         walletState.getNetwork()
         return
       }
       const ca = this.ca
+
+      // update my locking amount if needed
+      if (this.address && this.publicKey && walletState.network)
+        await fetch('/api/updateAmount', {
+          method: 'POST',
+          body: JSON.stringify({
+            address: this.address,
+            publicKey: this.publicKey,
+            blocks: this.lockingBlocks,
+            ca,
+            network: walletState.network
+          })
+        })
+          .then(ensureSuccess)
+          .catch(console.warn)
+
       fetch(`/api/supporters?address=${ca}&network=${this.network}`)
         .then(getJson)
         .then((supporters) => {
@@ -234,29 +253,31 @@ export class MemeDialog extends LitElement {
                 <p class="text-sm w-full" style="overflow-wrap: break-word; word-break: break-all;">
                   <span class="font-bold"> Ticker: ${this.meta.symbol} </span>
                 </p>
-                <p class="text-xs text-blue-200 flex flex-wrap items-center gap-1 break-all">
-                  ca:
+                <p class="text-xs text-blue-200 gap-1 break-all">
+                  <span>ca:</span>
                   <span class="text-mono">${this.ca}</span>
                 </p>
-                <p class="text-sm w-full" style="overflow-wrap: break-word; word-break: break-all;">
-                  ${this.meta.description}
+                <p class="text-sm w-full break-all max-h-28 overflow-y-scroll">${this.meta.description}</p>
+                <p class="flex items-center text-sm text-blue-200">
+                  Locked <sl-icon outline name="currency-bitcoin"></sl-icon> ${when(
+                    this.lockedAmount,
+                    () => formatUnits(this.lockedAmount.confirmed + this.lockedAmount.unconfirmed, 8),
+                    () => html`<sl-skeleton
+                      effect="pulse"
+                      class="w-16 [&::part(base)]:min-h-2 opacity-45"
+                      style="--color: var(--sl-color-blue-800);"
+                    ></sl-skeleton>`
+                  )}
                 </p>
-                ${when(
-                  this.lockedAmount,
-                  () => html`<p class="flex items-center text-sm font-bold text-blue-200">
-                    Locked <sl-icon outline name="currency-bitcoin"></sl-icon> ${formatUnits(
-                      this.lockedAmount.confirmed + this.lockedAmount.unconfirmed,
-                      8
-                    )}
-                  </p>`
-                )}
               </div>
             </div>
             <sl-tab-group>
               <sl-tab slot="nav" panel="support">Top Supporters</sl-tab>
               <sl-tab-panel name="support" class="text-gray-400 text-xs">
-                ${map(this.supporters, (supporter) => {
-                  return html`<p class="font-mono">
+                ${when(!this.supporters, () => html`<sl-skeleton effect="pulse"></sl-skeleton>`)}
+                ${map(
+                  this.supporters,
+                  (supporter) => html`<p class="font-mono">
                     <a
                       target="_blank"
                       href="${walletState.mempoolUrl}/address/${supporter.lock_address}"
@@ -265,7 +286,7 @@ export class MemeDialog extends LitElement {
                     >: ${formatUnits(supporter.confirmed + supporter.unconfirmed, 8)}
                     ${supporter.unconfirmed ? '(' + formatUnits(supporter.unconfirmed, 8) + ' unconfirmed)' : ''}
                   </p>`
-                })}
+                )}
               </sl-tab-panel>
             </sl-tab-group>
             <sl-tab-group>
@@ -336,6 +357,7 @@ OP_ENDIF
                 )}
               </sl-tab-panel>
               <sl-tab-panel name="unlock" class="text-gray-400 text-xs">
+                ${when(!this.lockedUtxos, () => html`<sl-skeleton effect="pulse"></sl-skeleton>`)}
                 ${map(
                   this.lockedUtxos,
                   (utxo) => html`<p class="flex items-center gap-1">
@@ -351,7 +373,7 @@ OP_ENDIF
                       utxo.status.confirmed,
                       () =>
                         when(
-                          this.height && this.lockAddresses[utxo.address as string],
+                          this.height && this.lockAddresses[utxo.address],
                           () =>
                             when(
                               utxo.status.block_height + this.lockAddresses[utxo.address].blocks > this.height!,
@@ -362,16 +384,21 @@ OP_ENDIF
                                     this.lockAddresses[utxo.address].blocks -
                                     this.height!}
                                     blocks remaining</span
-                                  >`,
-                              () =>
-                                html`<sl-button @click=${() => this.unlock(utxo)} variant="text" size="small"
-                                  >[unlock]</sl-button
-                                >`
+                                  >`
                             ),
                           () => html`<sl-spinner></sl-spinner>`
                         ),
                       () => '(unconfirmed)'
                     )}
+                    <sl-button
+                      @click=${() => this.unlock(utxo)}
+                      ?disabled=${!utxo.status.confirmed ||
+                      !(this.height && this.lockAddresses[utxo.address]) ||
+                      this.lockAddresses[utxo.address].blocks + utxo.status.block_height > this.height}
+                      variant="text"
+                      size="small"
+                      >[unlock]</sl-button
+                    >
                   </p>`
                 )}
               </sl-tab-panel>
@@ -410,7 +437,7 @@ OP_ENDIF
         >
           ${when(
             this.lockDialogError,
-            () =>
+            (err) =>
               html`
                 <div class="flex gap-2">
                   <sl-icon
@@ -418,7 +445,7 @@ OP_ENDIF
                     class="flex-none mt-0.5 text-rose-500"
                     style="font-size: 1.1rem;"
                   ></sl-icon>
-                  <p class="text-[var(--sl-color-neutral-800)]">${this.lockDialogError?.message}</p>
+                  <p class="text-[var(--sl-color-neutral-800)]">${err.message}</p>
                 </div>
               `,
             () => html`<p>3 Steps to go</p>`
@@ -581,18 +608,6 @@ OP_ENDIF
       .then((txid) => {
         console.log('lock transaction:', txid)
         // update locked amount on server
-        fetch('/api/updateAmount', {
-          method: 'POST',
-          body: JSON.stringify({
-            address: this.address,
-            publicKey: this.publicKey,
-            blocks: this.lockingBlocks,
-            ca: this.ca,
-            network: walletState.network
-          })
-        })
-          .then(ensureSuccess)
-          .catch(console.warn)
         this.updateLockDetails()
         toastImportant(`Successfully locked ${amount} BTC to <span class="font-mono break-all">${lockAddress}</span>`)
         this.dialogStep.value?.hide()

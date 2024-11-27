@@ -1,9 +1,8 @@
 import { createKysely } from '@vercel/postgres-kysely'
 import { DB } from '../api_lib/db/types.js'
+import { updateAmount } from '../api_lib/updateAmount.js'
 import { sql } from 'kysely'
-import { mempoolApiUrl } from '../lib/utils.js'
 import { Network } from '../lib/types.js'
-import { getJson } from '../lib/fetch.js'
 
 export function GET(request: Request) {
   if (!process.env.DATABASE_URL) {
@@ -18,40 +17,21 @@ export function GET(request: Request) {
 
   const db = createKysely<DB>({ connectionString: process.env.DATABASE_URL })
   return (
-    // update top 20 addresses with unconfirmed utxo
+    // update top 12 outdated addresses
     db
       .selectFrom(network == 'livenet' ? 'locked_amounts' : 'locked_amounts_testnet')
       .selectAll()
-      .where('unconfirmed', '>', 0)
-      // @todo fix this
-      // .where('last_update', '<', new Date(Date.now() - 1000 * 60))
-      .orderBy('unconfirmed', 'desc')
-      .limit(20)
+      .where('last_update', '<', new Date(Date.now() - 1000 * 60))
+      .orderBy(sql<string>`(confirmed + unconfirmed) desc`)
+      .limit(12)
       .execute()
-      .then((result) =>
-        Promise.all(
-          result.map((row) =>
-            fetch(mempoolApiUrl(`/api/address/${row.lock_address}`, network))
-              .then(getJson)
-              .then((result) => {
-                const confirmed = result.chain_stats.funded_txo_sum - result.chain_stats.spent_txo_sum
-                const unconfirmed = result.mempool_stats.funded_txo_sum - result.mempool_stats.spent_txo_sum
-
-                return createKysely<DB>({ connectionString: process.env.DATABASE_URL })
-                  .updateTable(network == 'livenet' ? 'locked_amounts' : 'locked_amounts_testnet')
-                  .set({ confirmed, unconfirmed, last_update: new Date() })
-                  .where('ca', '=', row.ca)
-                  .where('lock_address', '=', row.lock_address)
-                  .execute()
-              })
-          )
-        )
-      )
+      .then((result) => Promise.all(result.map((row) => updateAmount(row.lock_address, row.ca, network))))
       .then(() =>
         // fetch top 10 addresses
         db
           .selectFrom(network == 'livenet' ? 'locked_amounts' : 'locked_amounts_testnet')
           .selectAll()
+          .where((eb) => eb('confirmed', '<>', 0).or(eb('unconfirmed', '<>', 0)))
           .where('ca', '=', address)
           .orderBy(sql<string>`(confirmed + unconfirmed) desc`)
           .limit(10)
