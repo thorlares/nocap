@@ -82,8 +82,7 @@ export class OKX extends UniSat {
   }
 
   sendBitcoin(toAddress: string, satoshis: number, options?: { feeRate: number }): Promise<string> {
-    if (this._network != 'livenet') throw new Error('not implemented')
-    return this.instance.sendBitcoin(toAddress, satoshis, options)
+    return (this._instanceTestnet ? this._instanceTestnet : this.instance).sendBitcoin(toAddress, satoshis, options)
   }
 
   getInscriptions(cursor?: number, size?: number): Promise<{ total: number; list: Inscription[] }> {
