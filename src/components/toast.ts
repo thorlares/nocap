@@ -12,16 +12,16 @@ type ToastOptions = {
   innerHTML?: string
 }
 
-export function toastImportantError(err: Error, message?: any, options?: ToastOptions) {
-  return toastError(err, message, { closable: true, duration: Infinity, variant: 'danger', ...options })
+export function toastImportantError(err: Error | any, title?: any, options?: ToastOptions) {
+  return toastError(err, title, { closable: true, duration: Infinity, variant: 'danger', ...options })
 }
 
-export function toastError(err: Error, message?: any, options?: ToastOptions) {
+export function toastError(err: Error | any, title?: any, options?: ToastOptions) {
   const errMsg = err.message ?? err
   return _toast({
     icon: 'exclamation-triangle',
     variant: 'warning',
-    innerHTML: message ? `<h4 style="margin-block: 0;">${message}</h4>${errMsg}` : errMsg,
+    innerHTML: title ? `<h4 style="margin-block: 0;">${title}</h4>${errMsg}` : errMsg,
     ...options
   })
 }
