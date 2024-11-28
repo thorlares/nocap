@@ -1,6 +1,9 @@
 import { UniSat } from './unisat'
 import { Balance, Inscription, Network, SignPsbtOptions, WalletEvent } from '.'
-import { getJson } from '../../../lib/fetch'
+import { getBody, getJson } from '../../../lib/fetch'
+import { mempoolApiUrl } from '../../../lib/utils'
+import { bytesToHex, hexToBytes } from '@noble/hashes/utils'
+import * as btc from '@scure/btc-signer'
 
 export class OKX extends UniSat {
   private _network: Network = (localStorage.getItem('okx_network') as Network) ?? 'livenet'
@@ -110,7 +113,11 @@ export class OKX extends UniSat {
   }
 
   pushPsbt(psbtHex: string): Promise<string> {
-    if (this._network != 'livenet') throw new Error('not implemented')
-    return this.instance.pushPsbt(psbtHex)
+    if (this._network == 'livenet') return this.instance.pushPsbt(psbtHex)
+
+    return fetch(mempoolApiUrl('/api/tx', this._network), {
+      method: 'POST',
+      body: bytesToHex(btc.Transaction.fromPSBT(hexToBytes(psbtHex), { allowUnknownInputs: true }).extract())
+    }).then(getBody)
   }
 }

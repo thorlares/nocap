@@ -24,12 +24,13 @@ import { walletState } from '../lib/walletState'
 import { btcNetwork } from '../../lib/network'
 import { toXOnlyU8 } from '../../lib/utils'
 import { ensureSuccess, getJson } from '../../lib/fetch'
-import { toast, toastImportant } from './toast'
+import { toast, toastError, toastImportant } from './toast'
 import { getLockAddress, getLockAddressV0, getLockP2WSH, getLockP2WSHV0 } from '../../lib/lockAddress'
 import { formatUnits } from '@ethersproject/units'
 import { networks, payments, Psbt, script } from 'bitcoinjs-lib'
 import { bytes } from '@scure/base'
 import { witnessStackToScriptWitness } from '../lib/witnessStackToScriptWitness'
+import * as ordinals from 'micro-ordinals'
 
 @customElement('meme-dialog')
 export class MemeDialog extends LitElement {
@@ -94,7 +95,7 @@ export class MemeDialog extends LitElement {
 
   show() {
     this.dialog.value?.show()
-    if (!this.publicKey) walletState.getPublicKey()
+    if (!this.publicKey) walletState.getPublicKey().catch(toastError)
     if (this.meta?.id != this.ca) {
       this.meta = undefined
       // update meta
@@ -124,7 +125,7 @@ export class MemeDialog extends LitElement {
         return
       }
       if (!this.publicKey) {
-        walletState.getPublicKey()
+        walletState.getPublicKey().catch(toastError)
         return
       }
       walletState.updateHeight()
@@ -208,24 +209,18 @@ export class MemeDialog extends LitElement {
 
   get p2trInscription() {
     if (!this.publicKey) return undefined
+
+    const inscription = {
+      tags: { contentType: 'text/plain;charset=utf-8' },
+      body: utf8ToBytes(`v1|${this.publicKey}|${this.lockingBlocks}|${this.ca}`)
+    }
+    const customScripts = [ordinals.OutOrdinalReveal]
     return btc.p2tr(
       undefined,
-      {
-        script: btc.Script.encode([
-          toXOnlyU8(hexToBytes(this.publicKey)),
-          'CHECKSIG',
-          'OP_0',
-          'IF',
-          utf8ToBytes('ord'),
-          hexToBytes('01'),
-          utf8ToBytes('text/plain;charset=utf-8'),
-          'OP_0',
-          utf8ToBytes(`v1|${this.publicKey}|${this.lockingBlocks}|${this.ca}`),
-          'ENDIF'
-        ])
-      },
+      ordinals.p2tr_ord_reveal(toXOnlyU8(hexToBytes(this.publicKey)), [inscription]),
       btcNetwork(walletState.network),
-      true
+      false,
+      customScripts
     )
   }
 
@@ -310,11 +305,9 @@ export class MemeDialog extends LitElement {
                     ?disabled=${!this.publicKey}
                   ></sl-input>
                   ${when(
-                    this.publicKey,
+                    this.address,
                     () =>
-                      html`
-                        <button type="submit" class="w-full p-2 bg-blue-500 text-white hover:bg-blue-700">Lock</button>
-                      `,
+                      html`<sl-button variant="primary" type="submit" ?disabled=${!this.publicKey}>Lock</sl-button>`,
                     () => html`<connect-button variant="primary" class="w-full"></connect-button>`
                   )}
                 </form>
@@ -545,6 +538,10 @@ OP_ENDIF
         // Step 1: check if the inscription is already created
         fetch(walletState.mempoolApiUrl(`/api/address/${p2tr.address}`))
           .then(getJson)
+          .catch((e) => {
+            toastError(e, 'Failed to check inscription from mempool')
+            throw e
+          })
           .then((result) => {
             this.lockDialogHasInscription = result.chain_stats.funded_txo_sum || result.mempool_stats.spent_txo_sum
             if (!this.lockDialogHasInscription) {
@@ -553,7 +550,12 @@ OP_ENDIF
                 Promise.all([
                   network == 'devnet'
                     ? Promise.resolve({ minimumFee: 1, economyFee: 1, hourFee: 1 })
-                    : fetch(walletState.mempoolApiUrl('/api/v1/fees/recommended')).then(getJson),
+                    : fetch(walletState.mempoolApiUrl('/api/v1/fees/recommended'))
+                        .then(getJson)
+                        .catch((e) => {
+                          toastError(e, 'Failed to get recommanded fees from mempool')
+                          throw e
+                        }),
                   fetch('/api/lock', {
                     method: 'POST',
                     body: JSON.stringify({
@@ -563,7 +565,12 @@ OP_ENDIF
                       ca: this.ca,
                       network
                     })
-                  }).then(ensureSuccess)
+                  })
+                    .then(ensureSuccess)
+                    .catch((e) => {
+                      toastError(e, 'Failed to update lock info')
+                      throw e
+                    })
                 ])
                   // calculate inscription fee
                   .then(([feeRates]) => {
@@ -578,7 +585,7 @@ OP_ENDIF
                   .then((txid) => {
                     console.log('inscribe transaction:', txid)
                     this.lockDialogStep = 3
-                    const tx = new btc.Transaction()
+                    const tx = new btc.Transaction({ customScripts: [ordinals.OutOrdinalReveal] })
                     tx.addInput({
                       ...p2tr,
                       txid,
