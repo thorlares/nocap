@@ -47,7 +47,13 @@ export class OKX extends UniSat {
 
   get publicKey() {
     return this._instanceTestnet
-      ? this._instanceTestnet.getSelectedAccount().then((result: any) => result?.publicKey)
+      ? this._instanceTestnet.getSelectedAccount().then((result: any) => {
+          if (result?.publicKey) return result.publicKey
+          return this._instanceTestnet.connect().then((result: any) => {
+            if (result?.publicKey) return result.publicKey
+            if (result?.address) throw new Error('Failed to get public key. Is wallet unlocked?')
+          })
+        })
       : this.instance.getPublicKey()
   }
 
