@@ -9,8 +9,6 @@ import { mempoolApiUrl } from '../../lib/utils'
 import { ContextConsumer, ContextProvider, createContext } from '@lit/context'
 import { LitElement } from 'lit'
 
-export { StateController, type Unsubscribe } from '@lit-app/state'
-
 /**
  * Contexts consumable.
  * @see https://lit.dev/docs/data/context/#example
@@ -51,14 +49,14 @@ class WalletState extends State {
   public async updateAddress(): Promise<string> {
     return (this.promises['address'] ??= this.getConnector()
       .then((connector) => connector.accounts)
-      .then((accounts) => (this.addressProvider.setValue(accounts[0]), (this._address = accounts[0])))
+      .then((accounts) => (this.addressProvider.setValue((this._address = accounts[0])), accounts[0]))
       .finally(() => delete this.promises['address']))
   }
 
   public requestAccount(): Promise<string> {
     return this.getConnector()
       .then((connector) => connector.requestAccounts())
-      .then((accounts) => (this.addressProvider.setValue(accounts[0]), (this._address = accounts[0])))
+      .then((accounts) => (this.addressProvider.setValue((this._address = accounts[0])), accounts[0]))
   }
 
   protected onAccountChanged = (accounts: string[]) => {
@@ -68,6 +66,7 @@ class WalletState extends State {
       this._address = accounts[0]
       this.addressProvider.setValue(accounts[0])
       this.updatePublicKey()
+      this.updateNetwork()
     } else {
       this.addressProvider.setValue(undefined)
       this.publicKeyProvider.setValue(undefined)
@@ -89,7 +88,7 @@ class WalletState extends State {
   public async updateNetwork(): Promise<Network> {
     return (this.promises['network'] ??= this.getConnector()
       .then((connector) => connector.network)
-      .then((network) => (this.networkProvider.setValue(network), (this._network = network)))
+      .then((network) => (this.networkProvider.setValue((this._network = network)), network))
       .finally(() => delete this.promises['network']))
   }
   public switchNetwork(network: Network) {
@@ -113,7 +112,7 @@ class WalletState extends State {
     this.getAddress() // make sure we have an address
     return (this.promises['publicKey'] ??= this.getConnector()
       .then((connector) => connector.publicKey)
-      .then((pubKey) => (this.publicKeyProvider.setValue(pubKey), (this._publicKey = pubKey)))
+      .then((pubKey) => (this.publicKeyProvider.setValue((this._publicKey = pubKey)), pubKey))
       .finally(() => delete this.promises['publicKey']))
   }
 
@@ -152,7 +151,7 @@ class WalletState extends State {
   public async updateHeight(): Promise<number> {
     return (this.promises['height'] ??= fetch(this.mempoolApiUrl('/api/blocks/tip/height'))
       .then(getJson)
-      .then((height) => (this.heightProvider.setValue(height), (this._height = height)))
+      .then((height) => (this.heightProvider.setValue((this._height = height)), height))
       .finally(() => delete this.promises['height']))
   }
 
@@ -168,6 +167,7 @@ class WalletState extends State {
     return (
       this.connector ??
       (this.promises['connector'] ??= new Promise<Wallet>((resolve) => {
+        // may be improved, dependency on lit-app/state may be not necessary
         this.subscribe(
           (_, v) => {
             if (v) {
@@ -210,6 +210,9 @@ class WalletState extends State {
       .forEach(([key, definition]) => {
         ;(this as {} as { [key: string]: unknown })[key as string] = definition.resetValue
       })
+    this.publicKeyProvider.setValue(undefined)
+    this.networkProvider.setValue(undefined)
+    this.heightProvider.setValue(undefined)
     this.promises = {}
     if (resetConnectorAndAddress) {
       if (this._connector?.installed) this._connector.removeListener('accountsChanged', this.onAccountChanged)
@@ -217,7 +220,6 @@ class WalletState extends State {
       this._address = undefined
       this.addressProvider.setValue(undefined)
     }
-    this.publicKeyProvider.setValue(undefined)
   }
 }
 
