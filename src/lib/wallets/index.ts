@@ -66,6 +66,7 @@ export type Inscription = {
 }
 
 export type SignPsbtOptions = {
+  /** default to true */
   autoFinalized?: boolean
   toSignInputs: {
     index: number

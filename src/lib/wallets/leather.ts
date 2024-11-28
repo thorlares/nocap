@@ -233,7 +233,7 @@ export class Leather implements Wallet {
         recipients: [
           {
             address: toAddress,
-            amount: satoshis
+            amount: String(satoshis)
           }
         ],
         network: this.leatherNetwork
@@ -260,7 +260,7 @@ export class Leather implements Wallet {
       .request('signPsbt', requestParams)
       .then((response: any) => {
         const psbtHex = response.result.hex
-        if (options?.autoFinalized) {
+        if (options?.autoFinalized || options?.autoFinalized === undefined) {
           const finalTx = btc.Transaction.fromPSBT(hex.decode(psbtHex), { allowUnknownInputs: true })
           finalTx.finalize()
           return hex.encode(finalTx.toPSBT())

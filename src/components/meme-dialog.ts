@@ -599,9 +599,16 @@ OP_ENDIF
                     )
                     return walletState
                       .connector!.signPsbt(bytesToHex(tx.toPSBT()), {
+                        autoFinalized: false,
                         toSignInputs: [{ index: 0, publicKey: this.publicKey, disableTweakSigner: true }]
                       })
-                      .then((psbt) => walletState.connector!.pushPsbt(psbt))
+                      .then((psbt) => {
+                        const finalTx = btc.Transaction.fromPSBT(hexToBytes(psbt), {
+                          customScripts: [ordinals.OutOrdinalReveal]
+                        })
+                        finalTx.finalize()
+                        return walletState.connector!.pushPsbt(bytesToHex(finalTx.toPSBT()))
+                      })
                       .then((txid) => console.log('reveal transaction:', txid))
                   })
               )
