@@ -1,6 +1,7 @@
 import { createKysely } from '@vercel/postgres-kysely'
 import { DB } from '../api_lib/db/types.js'
 import { sql } from 'kysely'
+import { kv } from '@vercel/kv'
 
 export function GET(request: Request) {
   if (!process.env.DATABASE_URL) {
@@ -27,6 +28,19 @@ export function GET(request: Request) {
     .orderBy(sql<string>`(confirmed + unconfirmed) desc`)
     .limit(10)
     .execute()
+    .then((result) =>
+      kv.mget(result.map((row) => `nc:token:${row.ca}`)).then(
+        (values) => (
+          values.forEach((value: any, i) => {
+            result[i] = {
+              ...result[i],
+              ...value
+            }
+          }),
+          result
+        )
+      )
+    )
     .then((result) => new Response(JSON.stringify(result)))
     .catch((e) => {
       console.error(e)

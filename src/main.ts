@@ -133,11 +133,9 @@ export class AppMain extends LitElement {
                         src="https://www.pinclipart.com/picdir/big/184-1843111_pepe-the-frog-crying-png-clipart.png"
                       />
                     </span>
-                    <a href="/profile/5QzXgPb33A3UZCg775k9k6MJUgwWvsakHDCx651TNKWE">
-                      <span class="hover:underline">${this.lastCreate?.dev?.substring(0, 6)} </span>
-                    </a>
+                    <span>${this.lastCreate?.dev?.substring(0, 6)} </span>
                     <span>created </span>
-                    <a class="hover:underline flex gap-2" href="/coin/HJvQD3A83D6zEjo6kHt8fTwGYqNYkh9ZJ2yfW8Unpump">
+                    <span class="flex gap-2">
                       ${this.lastCreate?.symbol}
                       ${until(
                         this.lastCreate?.meta.then(
@@ -156,7 +154,7 @@ export class AppMain extends LitElement {
                           `
                         )
                       )}
-                    </a>
+                    </span>
                     <span> on 11/19/24 </span>
                   </div>
                 </sl-animation>
@@ -197,7 +195,7 @@ export class AppMain extends LitElement {
           </form>
         </div>
         <div class="flex justify-center mt-8">
-          <div class="w-[90vw] max-w-[500px]">
+          <div class="w-[90vw] max-w-[450px]">
             <h2 class="text-xl mb-4 text-center">Top Coins</h2>
             ${when(
               this.topMemes,
@@ -207,19 +205,31 @@ export class AppMain extends LitElement {
                     this.topMemes,
                     (meme) => html`
                       <div
-                        class="bg-gray-800 rounded-lg text-sm p-2 cursor-pointer hover:bg-gray-700 transition-colors"
+                        class="bg-gray-800 rounded-lg text-sm p-2 cursor-pointer hover:bg-gray-700 transition-colors flex flex-col gap-1"
                         @click=${() => {
                           this.memeDialog.value!.ca = meme.ca
                           this.memeDialog.value!.show()
                         }}
                       >
-                        <div class="flex items-center justify-between">
-                          <span class="font-mono text-neutral-200">${meme.ca}</span>
+                        <div class="flex gap-2">
+                          <img
+                            alt=""
+                            loading="lazy"
+                            width="20"
+                            height="20"
+                            decoding="async"
+                            data-nimg="1"
+                            class="h-5 w-5 rounded-full flex-none"
+                            src="${meme?.image}"
+                            style="color: transparent; display: block;"
+                          />
+                          <span class="flex-1 text-neutral-200">${meme.name} (${meme.symbol})</span>
                           <span class="flex items-center text-blue-200">
                             <sl-icon outline name="currency-bitcoin"></sl-icon>
                             ${formatUnits(meme.confirmed + meme.unconfirmed, 8)}
                           </span>
                         </div>
+                        <span class="font-mono text-neutral-400">${meme.ca}</span>
                       </div>
                     `
                   )}
