@@ -3,7 +3,10 @@
 @tailwind utilities;
 
 @layer components {
-  sl-divider {
-    border-top: solid var(--width) var(--color);
+  sl-divider:not([vertical]) {
+    border-top: solid var(--width) var(--color) !important;
+  }
+  sl-divider[vertical] {
+    border-left: solid var(--width) var(--color) !important;
   }
 }

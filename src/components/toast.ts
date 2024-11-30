@@ -18,6 +18,9 @@ export function toastImportantError(err: Error | any, title?: any, options?: Toa
 
 export function toastError(err: Error | any, title?: any, options?: ToastOptions) {
   const errMsg = err.message ?? err
+  try {
+    console.warn('[toast error]', title ?? '', err)
+  } catch (e) {}
   return _toast({
     icon: 'exclamation-triangle',
     variant: 'warning',
@@ -40,7 +43,7 @@ export function toastImportant(message: any, options?: ToastOptions) {
 export function toast(message: any, options?: ToastOptions) {
   const isError = message instanceof Error
   try {
-    console.info(isError ? 'toasting error:' : 'toasting', message?.message, message)
+    console.info('[toast]', message)
   } catch (e) {}
   return _toast({
     variant: options?.variant ?? (isError ? 'warning' : 'primary'),
@@ -58,5 +61,13 @@ function _toast(options: ToastOptions) {
     innerHTML: `<sl-icon slot="icon" name="${options?.icon ?? 'info-circle'}"></sl-icon>${options.innerHTML}`
   })
   document.body.append(alert)
+  Object.assign(alert, { originHide: alert.hide })
+  /** Sometimes SlAlert is toasting, need to wait for it before hiding */
+  alert.hide = () =>
+    alert.open
+      ? (alert as any).originHide()
+      : new Promise<void>((resolve) =>
+          alert.addEventListener('sl-after-show', () => resolve((alert as any).originHide()), { once: true })
+        )
   return { alert, toasting: alert.toast() }
 }

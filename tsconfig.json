@@ -19,5 +19,5 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "api_lib", "dashboard/src"]
+  "include": ["src", "api_lib", "brc20/src"]
 }
