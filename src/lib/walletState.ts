@@ -16,7 +16,7 @@ import { LitElement } from 'lit'
 export const walletContext = {
   address: createContext<string | undefined>('address'),
   publicKey: createContext<string | undefined>('publicKey'),
-  network: createContext<string | undefined>('network'),
+  network: createContext<Network | undefined>('network'),
   height: createContext<number | undefined>('height')
 }
 

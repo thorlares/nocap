@@ -33,7 +33,7 @@ export class ConnectButton extends LitElement {
   readonly address?: string
   @consume({ context: walletContext.network, subscribe: true })
   @state()
-  readonly network?: string
+  readonly network?: Network
 
   connectedCallback(): void {
     super.connectedCallback()

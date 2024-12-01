@@ -95,12 +95,12 @@ export class OKX extends UniSat {
   }
 
   getInscriptions(cursor?: number, size?: number): Promise<{ total: number; list: Inscription[] }> {
-    if (this._network != 'livenet') throw new Error('not implemented')
+    if (this._network != 'livenet') throw new Error('Not implemented in OKX wallet')
     return this.instance.getInscriptions(cursor, size)
   }
 
   sendInscription(toAddress: string, inscriptionId: string, options?: { feeRate: number }): Promise<string> {
-    if (this._network != 'livenet') throw new Error('not implemented')
+    if (this._network != 'livenet') throw new Error('Not implemented in OKX wallet')
     return this.instance.sendInscription(toAddress, inscriptionId, options)
   }
 

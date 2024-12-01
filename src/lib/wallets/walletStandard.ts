@@ -128,11 +128,11 @@ export class WalletStandard implements Wallet {
   }
 
   getInscriptions(_cursor?: number, _size?: number): Promise<{ total: number; list: Inscription[] }> {
-    throw new Error('not implemented')
+    throw new Error('Not implemented in wallet')
   }
 
   sendInscription(_toAddress: string, _inscriptionId: string, _options?: { feeRate: number }): Promise<string> {
-    throw new Error('not implemented')
+    throw new Error('Not implemented in wallet')
   }
 
   signPsbt(psbtHex: string, options?: SignPsbtOptions): Promise<string> {

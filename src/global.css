@@ -9,4 +9,7 @@ body {
     left: 0;
     right: auto;
   }
+  sl-alert pre{
+    @apply break-all whitespace-pre-wrap inline;
+  }
 }

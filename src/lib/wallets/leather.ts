@@ -245,11 +245,11 @@ export class Leather implements Wallet {
   }
 
   getInscriptions(): Promise<{ total: number; list: Inscription[] }> {
-    throw new Error('not implemented')
+    throw new Error('Not implemented in Leather wallet')
   }
 
   sendInscription(): Promise<string> {
-    throw new Error('not implemented')
+    throw new Error('Not implemented in Leather wallet')
   }
 
   signPsbt(psbtHex: string, options?: SignPsbtOptions): Promise<string> {

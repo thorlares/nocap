@@ -25,7 +25,7 @@ export function p2trInscribe(body: string, publicKey: Uint8Array, network?: Netw
 /** inscribe `body` to `receipt`(wallet address bydefault). */
 export function inscribe(body: any, receipt?: string) {
   if (!(body instanceof String)) body = JSON.stringify(body)
-  var { alert } = toastImportant(`Preparing inscribe <span style="white-space:pre-wrap">${body}</span>`)
+  var { alert } = toastImportant(`Preparing inscribe <pre>${body}</pre>`)
   return Promise.all([walletState.getAddress(), walletState.getNetwork()])
     .then(([address, network]) => {
       var privateKey = new Uint8Array(32)
@@ -47,11 +47,11 @@ export function inscribe(body: any, receipt?: string) {
       return fetchFeeRates
         .then((feeRates) => {
           console.debug('feeRates', feeRates)
-          inscriptionFee = Math.max(171 * feeRates.minimumFee, 86 * (feeRates.hourFee + feeRates.economyFee))
+          inscriptionFee = 171 * Math.max(feeRates.minimumFee, feeRates.halfHourFee)
         })
         .then(() => {
           alert.hide()
-          alert = toastImportant(`Sending BTC to inscribe <span style="white-space:pre-wrap">${body}</span>`).alert
+          alert = toastImportant(`Sending BTC to inscribe <pre>${body}</pre>`).alert
           return walletState.connector!.sendBitcoin(p2tr.address!, amountInscription + inscriptionFee)
         })
         .then(async (txid) => {
@@ -68,7 +68,7 @@ export function inscribe(body: any, receipt?: string) {
         })
         .then((txid) => {
           alert.hide()
-          alert = toastImportant(`Revealing <span style="white-space:pre-wrap">${body}</span>`).alert
+          alert = toastImportant(`Revealing <pre>${body}</pre>`).alert
           const tx = new btc.Transaction({ customScripts: [ordinals.OutOrdinalReveal] })
           tx.addInput({
             ...p2tr,

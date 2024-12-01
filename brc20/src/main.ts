@@ -12,22 +12,22 @@ import '@shoelace-style/shoelace/dist/components/button/button.js'
 import '@shoelace-style/shoelace/dist/components/divider/divider.js'
 import '@shoelace-style/shoelace/dist/components/input/input.js'
 import '@shoelace-style/shoelace/dist/components/skeleton/skeleton.js'
+import '@shoelace-style/shoelace/dist/components/dialog/dialog.js'
+import '@shoelace-style/shoelace/dist/components/spinner/spinner.js'
 import '../../src/components/connect.ts'
 import { toast, toastError, toastImportant } from '../../src/components/toast'
 import { consume, ContextConsumer } from '@lit/context'
 import { walletContext, walletState } from '../../src/lib/walletState'
 import { getJson } from '../../lib/fetch.js'
-import * as ordinals from 'micro-ordinals'
-import * as btc from '@scure/btc-signer'
-import { btcNetwork } from '../../lib/network.js'
-import { toXOnlyU8 } from '../../lib/utils.js'
-import { bytesToHex, hexToBytes, utf8ToBytes } from '@noble/hashes/utils'
 import { map } from 'lit/directives/map.js'
-import { Brc20Balance } from '../../lib/types.js'
+import { Brc20Balance, Network } from '../../lib/types.js'
 import { when } from 'lit/directives/when.js'
 import SlButton from '@shoelace-style/shoelace/dist/components/button/button.js'
 import { createRef, ref } from 'lit/directives/ref.js'
 import SlInput from '@shoelace-style/shoelace/dist/components/input/input.js'
+import SlDialog from '@shoelace-style/shoelace/dist/components/dialog/dialog.js'
+import { inscribe } from '../../src/lib/inscribe.js'
+import { getLockAddress } from './lib/lockAddress.js'
 
 setBasePath(import.meta.env.MODE === 'development' ? '../node_modules/@shoelace-style/shoelace/dist' : '/')
 
@@ -37,12 +37,30 @@ export class AppMain extends LitElement {
   @consume({ context: walletContext.address, subscribe: true })
   @state()
   address?: string
-
+  @consume({ context: walletContext.publicKey, subscribe: true })
   @state()
-  balances?: Brc20Balance[]
+  publicKey?: string
+  @consume({ context: walletContext.network, subscribe: true })
+  @state()
+  network?: Network
+
+  @state() balances?: Brc20Balance[]
+  @state() transferables: Record<string, any[]> = {}
+  @state() locked: Record<string, any[]> = {}
+
+  @state() lockDialogStep = 0
+  @state() lockDialogClosable = false
+  @state() lockDialogError?: Error
+  @state() lockResult?: { txid: string }
 
   private contextConsumers: any[] = []
   private inputTick = createRef<SlInput>()
+  private lockDialog = createRef<SlDialog>()
+
+  get lockAddress() {
+    if (!walletState.publicKey || !walletState.network) return 'loading'
+    return getLockAddress(walletState.publicKey, 10, walletState.network)
+  }
 
   connectedCallback(): void {
     super.connectedCallback()
@@ -58,6 +76,33 @@ export class AppMain extends LitElement {
     )
   }
 
+  private updateTransferableAndLocked(ticker: string) {
+    if (!this.address) throw new Error('Wallet not connected')
+    return Promise.all([
+      fetch(`/api/brc20Transferable?address=${this.address}&ticker=${ticker}`)
+        .then(getJson)
+        .then((data) => {
+          console.debug('BRC20 Transferable from server:', data)
+          this.transferables = { ...this.transferables, [ticker]: data?.data?.detail ?? [] }
+        })
+        .catch((err) => {
+          console.error(err)
+        }),
+      walletState.getPublicKey().then((publicKey) => {
+        if (!publicKey) return Promise.resolve()
+        return fetch(`/api/brc20Transferable?address=${this.lockAddress}&ticker=${ticker}`)
+          .then(getJson)
+          .then((data) => {
+            console.debug('BRC20 Transferable from server:', data)
+            this.locked = { ...this.locked, [ticker]: data?.data?.detail ?? [] }
+          })
+          .catch((err) => {
+            console.error(err)
+          })
+      })
+    ])
+  }
+
   private updateBalances() {
     if (!this.address) throw new Error('Wallet not connected')
     return fetch(`/api/brc20Balance?address=${this.address}`)
@@ -65,6 +110,9 @@ export class AppMain extends LitElement {
       .then((data) => {
         console.debug('BRC20 Balance from server:', data)
         this.balances = data?.data?.detail
+        this.balances?.forEach((b) => {
+          this.updateTransferableAndLocked(b.ticker)
+        })
       })
       .catch((err) => {
         console.error(err)
@@ -95,7 +143,7 @@ export class AppMain extends LitElement {
                         this.inputTick.value!.focus()
                         return toastError('Tick is required')
                       }
-                      this.inscribe({
+                      inscribe({
                         p: 'brc-20',
                         op: 'deploy',
                         tick: this.inputTick.value!.value,
@@ -112,7 +160,7 @@ export class AppMain extends LitElement {
                         this.inputTick.value!.focus()
                         return toastError('Tick is required')
                       }
-                      this.inscribe({ p: 'brc-20', op: 'mint', tick: this.inputTick.value!.value, amt: '1000' })
+                      inscribe({ p: 'brc-20', op: 'mint', tick: this.inputTick.value!.value, amt: '1000' })
                     }}
                     >Mint</sl-button
                   >
@@ -127,21 +175,67 @@ export class AppMain extends LitElement {
                 ${when(this.balances === undefined, () => html`<sl-skeleton effect="pulse"></sl-skeleton>`)}
                 ${map(
                   this.balances ?? [],
-                  (balance) => html`<form
-                    class="text-neutral-400 flex items-center gap-2"
-                    @submit=${(ev: Event) => {
-                      ev.preventDefault()
-                      const form = (ev.target as HTMLElement).closest('form') as HTMLFormElement
-                      if (!form) throw new Error('No form found')
-                      const inputAmount = form.querySelector('sl-input[name=amount]') as SlInput
-                      if (!inputAmount.value) return
-                      this.inscribe({ p: 'brc-20', op: 'transfer', tick: balance.ticker, amt: inputAmount.value })
-                    }}
-                  >
-                    ${balance.ticker}: ${balance.overallBalance}
-                    <sl-input type="number" name="amount" placeholder="amount" required></sl-input>
-                    <sl-button variant="primary" type="submit">Lock</sl-button>
-                  </form>`
+                  (balance) => html`<div class="flex px-1">
+                    <span>${balance.ticker}</span>
+                    <sl-divider vertical></sl-divider>
+                    <div class="flex flex-col gap-1">
+                      <span
+                        >Balance: ${balance.overallBalance} (${balance.transferableBalance ?? 'no'} transferable for
+                        locking)</span
+                      >
+                      <form
+                        class="flex items-center gap-2"
+                        @submit=${(ev: Event) => {
+                          ev.preventDefault()
+                          const form = (ev.target as HTMLElement).closest('form') as HTMLFormElement
+                          if (!form) throw new Error('No form found')
+                          const inputAmount = form.querySelector('sl-input[name=amount]') as SlInput
+                          if (!inputAmount.valueAsNumber) return
+                          inscribe({
+                            p: 'brc-20',
+                            op: 'transfer',
+                            tick: balance.ticker,
+                            amt: inputAmount.value
+                          }).then(() => this.updateTransferableAndLocked(balance.ticker))
+                        }}
+                      >
+                        <sl-input type="number" name="amount" placeholder="amount" size="small" required></sl-input>
+                        <sl-button variant="primary" type="submit" size="small">inscribe transfer</sl-button>
+                      </form>
+                      ${when(
+                        this.transferables[balance.ticker] === undefined,
+                        () => html`<sl-skeleton effect="pulse"></sl-skeleton>`,
+                        () => html` <span>Transferables:</span>
+                          <ul class="list-disc list-inside">
+                            ${map(
+                              this.transferables[balance.ticker],
+                              (detail) => html`<li>
+                                <span class="align-middle">${detail.data.amt}</span>
+                                <sl-button variant="text" size="small" @click=${() => this.lock(balance.ticker, detail)}
+                                  >lock</sl-button
+                                >
+                              </li>`
+                            )}
+                          </ul>`
+                      )}
+                      ${when(
+                        this.locked[balance.ticker] === undefined,
+                        () => html`<sl-skeleton effect="pulse"></sl-skeleton>`,
+                        () => html` <span>Locked:</span>
+                          <ul class="list-disc list-inside">
+                            ${map(
+                              this.locked[balance.ticker],
+                              (detail) => html`<li>
+                                <span class="align-middle">${detail.data.amt}</span>
+                                <sl-button variant="text" size="small" @click=${() => this.lock(balance.ticker, detail)}
+                                  >lock</sl-button
+                                >
+                              </li>`
+                            )}
+                          </ul>`
+                      )}
+                    </div>
+                  </div>`
                 )}
                 <sl-button
                   variant="primary"
@@ -157,85 +251,107 @@ export class AppMain extends LitElement {
           </div>
         </div>
       </main>
+      <sl-dialog
+        label="2 Steps to Lock BRC20 Token"
+        ${ref(this.lockDialog)}
+        @sl-request-close=${(event: CustomEvent) => {
+          if (!this.lockDialogClosable) event.preventDefault()
+        }}
+      >
+        ${when(
+          this.lockDialogError,
+          () => html`
+            <div slot="label" class="text-red-500 flex items-center gap-2">
+              <sl-icon name="exclamation-circle" class="flex-none mt-0.5"></sl-icon>
+              <p>${this.lockDialogError!.message}</p>
+            </div>
+          `
+        )}
+        <div class="flex flex-col gap-1">
+          <div class="flex gap-2 ${when(this.lockDialogStep != 1, () => 'text-neutral-500 text-sm')}">
+            <sl-icon
+              name="1-circle"
+              class="flex-none mt-1 ${when(this.lockDialogStep == 1, () => 'animate-pulse text-sky-500')}"
+            ></sl-icon>
+            <div class="flex-1">
+              <p>Transfer BRC20 to Self-Custody address</p>
+            </div>
+          </div>
+
+          <div class="flex gap-2 ${when(this.lockDialogStep != 2, () => 'text-neutral-500 text-sm')}">
+            <sl-icon
+              name="2-circle"
+              class="flex-none mt-1 ${when(this.lockDialogStep == 2, () => 'animate-pulse text-sky-500')}"
+            ></sl-icon>
+            <div class="flex-1">
+              <p>Inscribing transfer for Self-Custody address</p>
+            </div>
+          </div>
+
+          <sl-divider></sl-divider>
+
+          <p class="flex text-sm text-sl-neutral-600 gap-1">
+            <span class="flex-none">Self-Custody Address:</span>
+            <span class="font-mono break-all text-[var(--sl-color-neutral-700)]">${this.lockAddress}</span>
+          </p>
+          ${when(
+            this.publicKey,
+            () => html` <p class="text-sm text-sl-neutral-600">Self-Custody Script:</p>
+              <pre
+                class="p-1 px-2 w-full overflow-x-scroll text-xs text-[var(--sl-color-neutral-700)] border rounded border-[var(--sl-color-neutral-200)]"
+              >
+# Number of blocks to lock
+10
+# Fail if not after designated blocks
+OP_CHECKSEQUENCEVERIFY
+OP_DROP
+# Check signature against your own public key
+${this.publicKey}
+OP_CHECKSIG
+</pre>`
+          )}
+        </div>
+      </sl-dialog>
     `
   }
 
-  /** inscribe `body` to `reciept`(wallet address bydefault). */
-  inscribe(body: any, reciept?: string) {
-    body = JSON.stringify(body)
-    var { alert } = toastImportant(`Preparing inscribe <span style="white-space:pre-wrap">${body}</span>`)
-    return Promise.all([walletState.getAddress(), walletState.getNetwork()])
-      .then(([address, network]) => {
-        var privateKey = new Uint8Array(32)
-        crypto.getRandomValues(privateKey)
-        const publicKey = btc.utils.pubSchnorr(privateKey)
-
-        const inscription = {
-          tags: { contentType: 'text/plain;charset=utf-8' },
-          body: utf8ToBytes(body)
+  lock(ticker: string, detail: any) {
+    this.lockDialogStep = 1
+    this.lockDialogClosable = false
+    this.lockDialogError = undefined
+    this.lockDialog.value?.show()
+    var { alert } = toastImportant(`Transfering <pre>${detail.inscriptionId}</pre> to <pre>${this.lockAddress}</pre>`)
+    Promise.all([walletState.getPublicKey(), walletState.getNetwork()])
+      .then(() => walletState.connector?.sendInscription(this.lockAddress, detail.inscriptionId))
+      .then(async (txid) => {
+        toast(`BRC20 sent, txid: ${txid}`)
+        alert.hide()
+        alert = toastImportant(`Waiting for transaction to be announced in mempool<sl-spinner></sl-spinner>`).alert
+        await new Promise((r) => setTimeout(r, 1000))
+        while (true) {
+          const res = await fetch(`https://mempool.space/testnet/api/tx/${txid}`)
+          if (res.status == 200) break
+          await new Promise((r) => setTimeout(r, 3000))
         }
-        const customScripts = [ordinals.OutOrdinalReveal]
-        const p2tr = btc.p2tr(
-          undefined,
-          ordinals.p2tr_ord_reveal(publicKey, [inscription]),
-          btcNetwork(network),
-          false,
-          customScripts
-        )
-        var inscriptionFee = 0
-        const amountInscription = 650
-        const fetchFeeRates =
-          network == 'devnet'
-            ? Promise.resolve({ minimumFee: 1, economyFee: 1, hourFee: 1 })
-            : fetch(walletState.mempoolApiUrl('/api/v1/fees/recommended'))
-                .then(getJson)
-                .catch((e) => {
-                  toastError(e, 'Failed to get recommanded fees from mempool')
-                  throw e
-                })
-        return fetchFeeRates
-          .then((feeRates) => {
-            console.debug('feeRates', feeRates)
-            inscriptionFee = Math.max(171 * feeRates.minimumFee, 86 * (feeRates.hourFee + feeRates.economyFee))
-          })
-          .then(() => {
-            alert.hide()
-            alert = toastImportant(`Inscribing <span style="white-space:pre-wrap">${body}</span>`).alert
-            return walletState.connector!.sendBitcoin(p2tr.address!, amountInscription + inscriptionFee)
-          })
-          .then(async (txid) => {
-            toast(`Inscribe transaction sent, txid: ${txid}`)
-            alert.hide()
-            alert = toastImportant(`Waiting for inscription to be announced in mempool<sl-spinner></sl-spinner>`).alert
-            while (true) {
-              const res = await fetch(`https://mempool.space/testnet/api/tx/${txid}`)
-              if (res.status == 200) break
-              await new Promise((r) => setTimeout(r, 1000))
-            }
-            return txid
-          })
-          .then((txid) => {
-            alert.hide()
-            alert = toastImportant(`Revealing <span style="white-space:pre-wrap">${body}</span>`).alert
-            const tx = new btc.Transaction({ customScripts: [ordinals.OutOrdinalReveal] })
-            tx.addInput({
-              ...p2tr,
-              txid,
-              index: 0,
-              witnessUtxo: { script: p2tr.script, amount: BigInt(amountInscription + inscriptionFee) }
-            })
-            tx.addOutputAddress(reciept ?? address, BigInt(amountInscription), btcNetwork(network))
-            tx.sign(privateKey)
-            tx.finalize()
-            return walletState.connector!.pushPsbt(bytesToHex(tx.toPSBT()))
-          })
-          .then((txid) => {
-            alert.hide()
-            toast(`Reveal transaction sent, txid: ${txid}`)
-          })
+        return txid
       })
-      .catch((e) => toastError(e))
-      .finally(() => alert.hide())
+      .then(() => {
+        this.lockDialogStep = 2
+        alert.hide()
+        alert = toastImportant(`Inscribing transfer for <pre>${this.lockAddress}</pre>`).alert
+        return inscribe({ p: 'brc-20', op: 'transfer', tick: ticker, amt: detail.data.amt }, this.lockAddress)
+      })
+      .then(() => {
+        alert.hide()
+        toast('Successfully locked')
+        this.lockDialog.value?.hide()
+        this.updateTransferableAndLocked(ticker)
+      })
+      .catch((e) => {
+        alert.hide()
+        this.lockDialogError = e
+        this.lockDialogClosable = true
+      })
   }
 }
 
