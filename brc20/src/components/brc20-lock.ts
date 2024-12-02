@@ -385,7 +385,7 @@ export class Brc20Lock extends LitElement {
                                           const button = ev.target as SlButton
                                           button.disabled = button.loading = true
                                           this.finishLock(detail)
-                                            .then(() => this.updateLocked(detail.ticker))
+                                            .then(() => this.updateBalances())
                                             .finally(() => (button.disabled = button.loading = false))
                                         }}
                                         >finish locking</sl-button
