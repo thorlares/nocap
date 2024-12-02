@@ -2,10 +2,10 @@ import * as ordinals from 'micro-ordinals'
 import * as btc from '@scure/btc-signer'
 import { btcNetwork } from '../../lib/network'
 import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils'
-import { toast, toastError, toastImportant, toastImportantError } from '../../src/components/toast'
+import { toast, toastImportant, toastImportantError } from '../../src/components/toast'
 import { walletState } from '../../src/lib/walletState'
-import { getJson } from '../../lib/fetch'
 import { Network } from '../../lib/types'
+import { waitForTx } from './waitForTx'
 
 export function p2trInscribe(body: string, publicKey: Uint8Array, network?: Network) {
   const inscription = {
@@ -22,8 +22,11 @@ export function p2trInscribe(body: string, publicKey: Uint8Array, network?: Netw
   )
 }
 
-/** inscribe `body` to `receipt`(wallet address bydefault) with `amount`(default to 650 sats). */
-export function inscribe(body: any, receipt?: string, amount?: number) {
+/**
+ * Inscribe `body` to `receipt`(wallet address by default) with `amount`(default to 650 sats).
+ * @returns txid of inscription
+ */
+export function inscribe(body: any, receipt?: string, amount?: number): Promise<string> {
   if (!(body instanceof String)) body = JSON.stringify(body)
   var { alert } = toastImportant(`Preparing inscribe <pre>${body}</pre>`)
   return Promise.all([walletState.getAddress(), walletState.getNetwork()])
@@ -45,17 +48,13 @@ export function inscribe(body: any, receipt?: string, amount?: number) {
             feeRate: feeRates.halfHourFee
           })
         })
-        .then(async (txid) => {
+        .then((txid) => {
           toast(`Inscribe transaction sent, txid: ${txid}`)
           alert.hide()
-          alert = toastImportant(`Waiting for inscription to be announced in mempool<sl-spinner></sl-spinner>`).alert
-          await new Promise((r) => setTimeout(r, 1000))
-          while (true) {
-            const res = await fetch(`https://mempool.space/testnet/api/tx/${txid}`)
-            if (res.status == 200) break
-            await new Promise((r) => setTimeout(r, 3000))
-          }
-          return txid
+          alert = toastImportant(
+            `Waiting for inscribe transaction to be announced in mempool<sl-spinner></sl-spinner>`
+          ).alert
+          return waitForTx(txid)
         })
         .then((txid) => {
           alert.hide()
@@ -70,6 +69,8 @@ export function inscribe(body: any, receipt?: string, amount?: number) {
           tx.addOutputAddress(receipt ?? address, BigInt(amountInscription), btcNetwork(network))
           tx.sign(privateKey)
           tx.finalize()
+          // TBD: post to mempool to speedup
+          // fetch(walletState.mempoolApiUrl('/api/tx'), { method: 'POST', body: bytesToHex(tx.extract()) })
           return walletState.connector!.pushPsbt(bytesToHex(tx.toPSBT()))
         })
         .then((txid) => {

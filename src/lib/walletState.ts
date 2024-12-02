@@ -40,14 +40,16 @@ class WalletState extends State {
     fastestFee: number
     halfHourFee: number
   }> {
-    return this._network != 'devnet'
-      ? fetch(this.mempoolApiUrl('/api/v1/fees/recommended'))
-          .then(getJson)
-          .catch((e) => {
-            console.error(e)
-            throw e
-          })
-      : Promise.resolve({ minimumFee: 1, economyFee: 1, hourFee: 1, fastestFee: 1, halfHourFee: 1 })
+    return this.getNetwork().then((network) =>
+      network != 'devnet'
+        ? fetch(this.mempoolApiUrl('/api/v1/fees/recommended'))
+            .then(getJson)
+            .catch((e) => {
+              console.error(e)
+              throw e
+            })
+        : Promise.resolve({ minimumFee: 1, economyFee: 1, hourFee: 1, fastestFee: 1, halfHourFee: 1 })
+    )
   }
 
   // ---- address ----
