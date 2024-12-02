@@ -39,6 +39,12 @@ export class AppMain extends LitElement {
     )
   }
 
+  disconnectedCallback(): void {
+    super.disconnectedCallback()
+    this.busyUpdaters.forEach((c) => c.cancel())
+    this.busyUpdaters = []
+  }
+
   fetchMeta(uri: string) {
     return fetch(uri)
       .catch((e) => {
@@ -49,23 +55,33 @@ export class AppMain extends LitElement {
       .then(getJson)
   }
 
-  private busyUpdaters: Promise<any>[] = []
+  // @todo move this busy updater to library
+  private busyUpdaters: {
+    runner: Promise<void>
+    cancel: () => void
+  }[] = []
 
-  busyLoop(f: () => Promise<any> | any, minInterval = 1000, maxInterval = 5000): Promise<void> {
-    return (async () => {
-      while (true) {
-        const result = f()
-        if (result instanceof Promise) await result
-        await new Promise((r) =>
-          setTimeout(
-            r,
-            maxInterval == minInterval
-              ? maxInterval
-              : minInterval + Math.floor(Math.random() * (maxInterval - minInterval))
+  busyLoop(f: () => Promise<any> | any, minInterval = 1000, maxInterval = 5000) {
+    var cancel = false
+    return {
+      runner: (async () => {
+        while (!cancel) {
+          const result = f()
+          if (result instanceof Promise) await result
+          await new Promise((r) =>
+            setTimeout(
+              r,
+              maxInterval == minInterval
+                ? maxInterval
+                : minInterval + Math.floor(Math.random() * (maxInterval - minInterval))
+            )
           )
-        )
+        }
+      })(),
+      cancel: () => {
+        cancel = true
       }
-    })()
+    }
   }
 
   getLastCreatedCoin() {

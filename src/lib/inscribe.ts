@@ -22,8 +22,8 @@ export function p2trInscribe(body: string, publicKey: Uint8Array, network?: Netw
   )
 }
 
-/** inscribe `body` to `receipt`(wallet address bydefault). */
-export function inscribe(body: any, receipt?: string) {
+/** inscribe `body` to `receipt`(wallet address bydefault) with `amount`(default to 650 sats). */
+export function inscribe(body: any, receipt?: string, amount?: number) {
   if (!(body instanceof String)) body = JSON.stringify(body)
   var { alert } = toastImportant(`Preparing inscribe <pre>${body}</pre>`)
   return Promise.all([walletState.getAddress(), walletState.getNetwork()])
@@ -34,25 +34,16 @@ export function inscribe(body: any, receipt?: string) {
 
       const p2tr = p2trInscribe(body, publicKey, network)
       var inscriptionFee = 0
-      const amountInscription = 650
-      const fetchFeeRates =
-        network == 'devnet'
-          ? Promise.resolve({ minimumFee: 1, economyFee: 1, hourFee: 1 })
-          : fetch(walletState.mempoolApiUrl('/api/v1/fees/recommended'))
-              .then(getJson)
-              .catch((e) => {
-                toastError(e, 'Failed to get recommanded fees from mempool')
-                throw e
-              })
-      return fetchFeeRates
+      const amountInscription = amount || 650
+      return walletState.feeRates
         .then((feeRates) => {
           console.debug('feeRates', feeRates)
           inscriptionFee = 171 * Math.max(feeRates.minimumFee, feeRates.halfHourFee)
-        })
-        .then(() => {
           alert.hide()
           alert = toastImportant(`Sending BTC to inscribe <pre>${body}</pre>`).alert
-          return walletState.connector!.sendBitcoin(p2tr.address!, amountInscription + inscriptionFee)
+          return walletState.connector!.sendBitcoin(p2tr.address!, amountInscription + inscriptionFee, {
+            feeRate: feeRates.halfHourFee
+          })
         })
         .then(async (txid) => {
           toast(`Inscribe transaction sent, txid: ${txid}`)

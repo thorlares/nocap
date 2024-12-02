@@ -31,6 +31,7 @@ import { networks, payments, Psbt, script } from 'bitcoinjs-lib'
 import { bytes } from '@scure/base'
 import { witnessStackToScriptWitness } from '../lib/witnessStackToScriptWitness'
 import * as ordinals from 'micro-ordinals'
+import '../../brc20/src/components/brc20-lock'
 
 @customElement('meme-dialog')
 export class MemeDialog extends LitElement {
@@ -252,82 +253,93 @@ export class MemeDialog extends LitElement {
                   <span class="text-mono">${this.ca}</span>
                 </p>
                 <p class="text-sm w-full break-all max-h-28 overflow-y-scroll">${this.meta.description}</p>
-                <p class="flex items-center text-sm text-blue-200">
-                  Locked <sl-icon outline name="currency-bitcoin"></sl-icon> ${when(
-                    this.lockedAmount,
-                    () => formatUnits(this.lockedAmount.confirmed + this.lockedAmount.unconfirmed, 8),
-                    () => html`<sl-skeleton
-                      effect="pulse"
-                      class="w-16 [&::part(base)]:min-h-2 opacity-45"
-                      style="--color: var(--sl-color-blue-800);"
-                    ></sl-skeleton>`
-                  )}
-                </p>
               </div>
             </div>
             <sl-tab-group>
-              <sl-tab slot="nav" panel="support">Top Supporters</sl-tab>
-              <sl-tab-panel name="support" class="text-gray-400 text-xs">
-                ${when(!this.supporters, () => html`<sl-skeleton effect="pulse"></sl-skeleton>`)}
-                ${map(
-                  this.supporters,
-                  (supporter) => html`<p class="font-mono">
-                    <a
-                      target="_blank"
-                      href="${walletState.mempoolUrl}/address/${supporter.lock_address}"
-                      class="underline hover:no-underline"
-                      >${supporter.lock_address.slice(0, 8) + '...' + supporter.lock_address.slice(-6)}</a
-                    >: ${formatUnits(supporter.confirmed + supporter.unconfirmed, 8)}
-                    ${supporter.unconfirmed ? '(' + formatUnits(supporter.unconfirmed, 8) + ' unconfirmed)' : ''}
-                  </p>`
-                )}
-              </sl-tab-panel>
-            </sl-tab-group>
-            <sl-tab-group>
-              <sl-tab slot="nav" panel="support">Support</sl-tab>
-              <sl-tab slot="nav" panel="unlock" ?disabled=${!this.lockedUtxos?.length}>Unlock</sl-tab>
-
-              <sl-tab-panel name="support">
-                <form
-                  class="w-full flex flex-col gap-2"
-                  @submit=${(e: Event) => {
-                    e.preventDefault()
-                    const data = new FormData(e.target as HTMLFormElement)
-                    const amount = Number(data.get('amount'))
-                    this.lockBTC(amount)
-                  }}
-                >
-                  <sl-input
-                    name="amount"
-                    class="w-full"
-                    placeholder="Enter an amount of bitcoin"
-                    tabindex="1"
-                    ?disabled=${!this.publicKey}
-                  ></sl-input>
-                  ${when(
-                    this.address,
-                    () =>
-                      html`<sl-button variant="primary" type="submit" ?disabled=${!this.publicKey}>Lock</sl-button>`,
-                    () => html`<connect-button variant="primary" class="w-full"></connect-button>`
-                  )}
-                </form>
-
-                ${when(
-                  this.publicKey,
-                  () => html`
-                    <p class="text-sm mt-4 text-sl-neutral-600">
-                      Self-Custody Address:
-                      <span class="font-mono text-xs break-words text-[var(--sl-color-neutral-700)]"
-                        >${this.getLockAddress}</span
-                      >
+              <sl-tab slot="nav" panel="BTC">Bitcoin</sl-tab>
+              <sl-tab slot="nav" panel="BRC20">BRC20</sl-tab>
+              <sl-tab-panel name="BTC" class="bg-neutral-900 px-3">
+                <div class="flex">
+                  <div class="flex-1">
+                    <h4>Total BTC locked</h4>
+                    <p class="flex items-center text-sm text-blue-200">
+                      <sl-icon outline name="currency-bitcoin"></sl-icon> ${when(
+                        this.lockedAmount,
+                        () => formatUnits(this.lockedAmount.confirmed + this.lockedAmount.unconfirmed, 8),
+                        () => html`<sl-skeleton
+                          effect="pulse"
+                          class="w-16 [&::part(base)]:min-h-2 opacity-45"
+                          style="--color: var(--sl-color-blue-800);"
+                        ></sl-skeleton>`
+                      )}
                     </p>
-                    <p class="text-sm mt-2 text-sl-neutral-600">
-                      Self-Custody Script:
-                      <!-- <a class="text-green-600 underline hover:no-underline cursor-pointer">verify</a> -->
-                    </p>
-                    <pre
-                      class="mt-2 p-1 px-2 w-full overflow-x-scroll text-xs text-[var(--sl-color-neutral-700)] border rounded border-[var(--sl-color-neutral-200)]"
+                  </div>
+                  <div class="flex-1">
+                    <h4>Top Supporters</h4>
+                    <div class="text-gray-400 text-xs">
+                      ${when(!this.supporters, () => html`<sl-skeleton effect="pulse"></sl-skeleton>`)}
+                      ${map(
+                        this.supporters,
+                        (supporter) => html`<p class="font-mono">
+                          <a
+                            target="_blank"
+                            href="${walletState.mempoolUrl}/address/${supporter.lock_address}"
+                            class="underline hover:no-underline"
+                            >${supporter.lock_address.slice(0, 8) + '...' + supporter.lock_address.slice(-6)}</a
+                          >: ${formatUnits(supporter.confirmed + supporter.unconfirmed, 8)}
+                          ${supporter.unconfirmed ? '(' + formatUnits(supporter.unconfirmed, 8) + ' unconfirmed)' : ''}
+                        </p>`
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <sl-tab-group>
+                  <sl-tab slot="nav" panel="support">Support</sl-tab>
+                  <sl-tab slot="nav" panel="unlock" ?disabled=${!this.lockedUtxos?.length}>Unlock</sl-tab>
+
+                  <sl-tab-panel name="support">
+                    <form
+                      class="w-full flex flex-col gap-2"
+                      @submit=${(e: Event) => {
+                        e.preventDefault()
+                        const data = new FormData(e.target as HTMLFormElement)
+                        const amount = Number(data.get('amount'))
+                        this.lockBTC(amount)
+                      }}
                     >
+                      <sl-input
+                        name="amount"
+                        class="w-full"
+                        placeholder="Enter an amount of bitcoin"
+                        tabindex="1"
+                        ?disabled=${!this.publicKey}
+                      ></sl-input>
+                      ${when(
+                        this.address,
+                        () =>
+                          html`<sl-button variant="primary" type="submit" ?disabled=${!this.publicKey}
+                            >Lock</sl-button
+                          >`,
+                        () => html`<connect-button variant="primary" class="w-full"></connect-button>`
+                      )}
+                    </form>
+
+                    ${when(
+                      this.publicKey,
+                      () => html`
+                        <p class="text-sm mt-4 text-sl-neutral-600">
+                          Self-Custody Address:
+                          <span class="font-mono text-xs break-words text-[var(--sl-color-neutral-700)]"
+                            >${this.getLockAddress}</span
+                          >
+                        </p>
+                        <p class="text-sm mt-2 text-sl-neutral-600">
+                          Self-Custody Script:
+                          <!-- <a class="text-green-600 underline hover:no-underline cursor-pointer">verify</a> -->
+                        </p>
+                        <pre
+                          class="mt-2 p-1 px-2 w-full overflow-x-scroll text-xs text-[var(--sl-color-neutral-700)] border rounded border-[var(--sl-color-neutral-200)]"
+                        >
 # Number of blocks to lock
 OP_${this.lockingBlocks}
 # Fail if not after designated blocks
@@ -345,55 +357,58 @@ OP_IF
 ${this.ca}
 OP_ENDIF
 </pre>
-                  `
-                )}
-              </sl-tab-panel>
-              <sl-tab-panel name="unlock" class="text-gray-400 text-xs">
-                ${when(!this.lockedUtxos, () => html`<sl-skeleton effect="pulse"></sl-skeleton>`)}
-                ${map(
-                  this.lockedUtxos,
-                  (utxo) => html`<p class="flex items-center gap-1">
-                    <span class="font-mono"
-                      ><a
-                        target="_blank"
-                        href="${walletState.mempoolUrl}/tx/${utxo.txid}"
-                        class="underline hover:no-underline"
-                        >${utxo.txid.slice(0, 5) + '...' + utxo.txid.slice(-5)}</a
-                      >: ${formatUnits(utxo.value, 8)}</span
-                    >
-                    ${when(
-                      utxo.status.confirmed,
-                      () =>
-                        when(
-                          this.height && this.lockAddresses[utxo.address],
+                      `
+                    )}
+                  </sl-tab-panel>
+                  <sl-tab-panel name="unlock" class="text-gray-400 text-xs">
+                    ${when(!this.lockedUtxos, () => html`<sl-skeleton effect="pulse"></sl-skeleton>`)}
+                    ${map(
+                      this.lockedUtxos,
+                      (utxo) => html`<p class="flex items-center gap-1">
+                        <span class="font-mono"
+                          ><a
+                            target="_blank"
+                            href="${walletState.mempoolUrl}/tx/${utxo.txid}"
+                            class="underline hover:no-underline"
+                            >${utxo.txid.slice(0, 5) + '...' + utxo.txid.slice(-5)}</a
+                          >: ${formatUnits(utxo.value, 8)}</span
+                        >
+                        ${when(
+                          utxo.status.confirmed,
                           () =>
                             when(
-                              utxo.status.block_height + this.lockAddresses[utxo.address].blocks > this.height!,
+                              this.height && this.lockAddresses[utxo.address],
                               () =>
-                                html`<sl-icon name="clock-history"></sl-icon>
-                                  <span
-                                    >${utxo.status.block_height +
-                                    this.lockAddresses[utxo.address].blocks -
-                                    this.height!}
-                                    blocks remaining</span
-                                  >`
+                                when(
+                                  utxo.status.block_height + this.lockAddresses[utxo.address].blocks > this.height!,
+                                  () =>
+                                    html`<sl-icon name="clock-history"></sl-icon>
+                                      <span
+                                        >${utxo.status.block_height +
+                                        this.lockAddresses[utxo.address].blocks -
+                                        this.height!}
+                                        blocks remaining</span
+                                      >`
+                                ),
+                              () => html`<sl-spinner></sl-spinner>`
                             ),
-                          () => html`<sl-spinner></sl-spinner>`
-                        ),
-                      () => '(unconfirmed)'
+                          () => '(unconfirmed)'
+                        )}
+                        <sl-button
+                          @click=${() => this.unlock(utxo)}
+                          ?disabled=${!utxo.status.confirmed ||
+                          !(this.height && this.lockAddresses[utxo.address]) ||
+                          this.lockAddresses[utxo.address].blocks + utxo.status.block_height > this.height}
+                          variant="text"
+                          size="small"
+                          >[unlock]</sl-button
+                        >
+                      </p>`
                     )}
-                    <sl-button
-                      @click=${() => this.unlock(utxo)}
-                      ?disabled=${!utxo.status.confirmed ||
-                      !(this.height && this.lockAddresses[utxo.address]) ||
-                      this.lockAddresses[utxo.address].blocks + utxo.status.block_height > this.height}
-                      variant="text"
-                      size="small"
-                      >[unlock]</sl-button
-                    >
-                  </p>`
-                )}
+                  </sl-tab-panel>
+                </sl-tab-group>
               </sl-tab-panel>
+              <sl-tab-panel name="BRC20" class="bg-neutral-900 px-3"><brc20-lock></brc20-lock></sl-tab-panel>
             </sl-tab-group>
           `,
           () => html`
@@ -413,6 +428,7 @@ OP_ENDIF
           `
         )}
       </sl-dialog>
+      <!-- locking steps dialog -->
       <sl-dialog
         no-header
         class="[&::part(body)]:p-0 [&::part(overlay)]:bg-[rgba(0,0,0,0.8)]"
@@ -548,14 +564,7 @@ OP_ENDIF
               return (
                 // get recommended fees and post lock info to server
                 Promise.all([
-                  network == 'devnet'
-                    ? Promise.resolve({ minimumFee: 1, economyFee: 1, hourFee: 1 })
-                    : fetch(walletState.mempoolApiUrl('/api/v1/fees/recommended'))
-                        .then(getJson)
-                        .catch((e) => {
-                          toastError(e, 'Failed to get recommanded fees from mempool')
-                          throw e
-                        }),
+                  walletState.feeRates,
                   fetch('/api/lock', {
                     method: 'POST',
                     body: JSON.stringify({
@@ -661,10 +670,7 @@ OP_ENDIF
       }
     }
     // fetch recommended fees
-    ;(walletState.network == 'devnet'
-      ? Promise.resolve({ minimumFee: 1, economyFee: 1, hourFee: 1 })
-      : fetch(walletState.mempoolApiUrl('/api/v1/fees/recommended')).then(getJson)
-    ).then((feeRates) => {
+    walletState.feeRates.then((feeRates) => {
       const fee = Math.max(175 * feeRates.minimumFee, 60 * (feeRates.hourFee + feeRates.economyFee))
       const network =
         walletState.network == 'livenet'

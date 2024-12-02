@@ -33,6 +33,22 @@ class WalletState extends State {
     if (this._network == 'devnet') return 'http://localhost:8083'
     return 'https://mempool.space' + (this._network != 'livenet' ? `/${this._network}` : '')
   }
+  public get feeRates(): Promise<{
+    minimumFee: number
+    economyFee: number
+    hourFee: number
+    fastestFee: number
+    halfHourFee: number
+  }> {
+    return this._network != 'devnet'
+      ? fetch(this.mempoolApiUrl('/api/v1/fees/recommended'))
+          .then(getJson)
+          .catch((e) => {
+            console.error(e)
+            throw e
+          })
+      : Promise.resolve({ minimumFee: 1, economyFee: 1, hourFee: 1, fastestFee: 1, halfHourFee: 1 })
+  }
 
   // ---- address ----
   private addressProvider = new ContextProvider(document.body, { context: walletContext.address })
