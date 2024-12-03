@@ -105,7 +105,7 @@ export class MemeDialog extends LitElement {
         .then((meta) => {
           if (meta.id == this.ca) this.meta = meta
         })
-        .catch(toastImportant)
+        .catch((e) => toastError(e, 'Failed to get coin details'))
       this.updateLockDetails()
     }
   }
@@ -252,6 +252,17 @@ export class MemeDialog extends LitElement {
                   <span>ca:</span>
                   <span class="text-mono">${this.ca}</span>
                 </p>
+                ${when(
+                  this.meta.price.price,
+                  () => html`
+                    <p class="text-xs text-green-400">
+                      Market Cap: $${(Number(this.meta.price.price) * 1000000000).toFixed(2)}
+                      <span class="text-gray-400 ml-1">
+                        (Updated: ${new Date(this.meta.price.timestamp).toLocaleString()})
+                      </span>
+                    </p>
+                  `
+                )}
                 <p class="text-sm w-full break-all max-h-28 overflow-y-scroll">${this.meta.description}</p>
               </div>
             </div>

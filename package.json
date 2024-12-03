@@ -36,6 +36,7 @@
     "kysely": "^0.27.4",
     "lit": "^3.2.1",
     "micro-ordinals": "^0.1.1",
+    "moralis": "^2.27.2",
     "pg": "^8.13.1",
     "sats-connect-v1": "npm:sats-connect@1.0.0",
     "varuint-bitcoin": "^2.0.0"
