@@ -94,7 +94,7 @@ export function GET(request: Request) {
   return kv
     .mget(metaCacheKey, priceCacheKey)
     .then(([meta, price]) => {
-      if (meta && price) return { ...meta, price }
+      if (meta && price) return { id: address, ...meta, price }
 
       const promises: Promise<any>[] = []
 
@@ -145,7 +145,7 @@ export function GET(request: Request) {
               })
       )
 
-      return Promise.all(promises).then(([meta, price]) => ({ ...meta, price }))
+      return Promise.all(promises).then(([meta, price]) => ({ id: address, ...meta, price }))
     })
     .then((result) => new Response(JSON.stringify(result)))
     .catch((e) => new Response(e.message, { status: 500 }))
