@@ -25,19 +25,22 @@ import { btcNetwork } from '../../lib/network'
 import { toXOnlyU8 } from '../../lib/utils'
 import { ensureSuccess, getJson } from '../../lib/fetch'
 import { toast, toastError, toastImportant } from './toast'
-import { getLockAddress, getLockAddressV0, getLockP2WSH, getLockP2WSHV0 } from '../../lib/lockAddress'
+import { getLockCaAddress, getLockCaAddressV0, getLockCaP2WSH, getLockCaP2WSHV0 } from '../../lib/lockAddress'
 import { formatUnits } from '@ethersproject/units'
 import { networks, payments, Psbt, script } from 'bitcoinjs-lib'
 import { bytes } from '@scure/base'
 import { witnessStackToScriptWitness } from '../lib/witnessStackToScriptWitness'
 import * as ordinals from 'micro-ordinals'
 import '../../brc20/src/components/brc20-lock'
+import { TokenPrice } from '../../lib/types'
 
 @customElement('meme-dialog')
 export class MemeDialog extends LitElement {
   static styles = [unsafeCSS(style)]
   @property({ type: String }) ca?: string
+
   @state() meta: any
+  @state() price?: TokenPrice
   @state() lockDialogStep = 0
   @state() lockDialogClosable = false
   @state() lockDialogHasInscription = false
@@ -106,6 +109,17 @@ export class MemeDialog extends LitElement {
           if (meta.id == this.ca) this.meta = meta
         })
         .catch((e) => toastError(e, 'Failed to get coin details'))
+    }
+    if (this.price?.id != this.ca) {
+      this.price = undefined
+      // update price
+      fetch(`/api/price?address=${this.ca}`)
+        .then(getJson)
+        .then((price) => {
+          if (price.id == this.ca) this.price = price
+        })
+        .catch(console.warn)
+
       this.updateLockDetails()
     }
   }
@@ -135,8 +149,8 @@ export class MemeDialog extends LitElement {
       this.lockedUtxos = undefined
       // update my locked utxos
       ;[
-        getLockAddressV0(this.mpcPubKey, this.publicKey, ca, this.lockingBlocks, walletState.network!),
-        getLockAddress(this.publicKey, ca, this.lockingBlocks, walletState.network!)
+        getLockCaAddressV0(this.mpcPubKey, this.publicKey, ca, this.lockingBlocks, walletState.network!),
+        getLockCaAddress(this.publicKey, ca, this.lockingBlocks, walletState.network!)
       ].forEach((lockAddress) => {
         if (!this.lockAddresses[lockAddress])
           fetch(`/api/lockAddress?address=${lockAddress}`)
@@ -205,7 +219,7 @@ export class MemeDialog extends LitElement {
 
   get getLockAddress() {
     if (!this.publicKey) return 'loading'
-    return getLockAddress(this.publicKey, this.ca!, this.lockingBlocks, walletState.network!)
+    return getLockCaAddress(this.publicKey, this.ca!, this.lockingBlocks, walletState.network!)
   }
 
   get p2trInscription() {
@@ -252,17 +266,20 @@ export class MemeDialog extends LitElement {
                   <span>ca:</span>
                   <span class="text-mono">${this.ca}</span>
                 </p>
-                ${when(
-                  this.meta.price.price,
-                  () => html`
-                    <p class="text-xs text-green-400">
-                      Market Cap: $${(Number(this.meta.price.price) * 1000000000).toFixed(2)}
-                      <span class="text-gray-400 ml-1">
-                        (Updated: ${new Date(this.meta.price.timestamp).toLocaleString()})
-                      </span>
-                    </p>
-                  `
-                )}
+                <p class="text-xs text-green-400">
+                  Market Cap:
+                  ${when(
+                    this.price,
+                    (price) => html`
+                      $${(Number(price.price) * 1000000000).toFixed(2)}
+                      <span class="text-gray-400 ml-1"> (Updated: ${new Date(price.timestamp).toLocaleString()}) </span>
+                    `,
+                    () => html`<sl-skeleton
+                      effect="pulse"
+                      class="w-16 inline-block [&::part(base)]:min-h-2"
+                    ></sl-skeleton>`
+                  )}
+                </p>
                 <p class="text-sm w-full break-all max-h-28 overflow-y-scroll">${this.meta.description}</p>
               </div>
             </div>
@@ -658,10 +675,10 @@ OP_ENDIF
     const addressParams = this.lockAddresses[utxo.address]
 
     // try recover p2wsh
-    var p2wsh = getLockP2WSH(addressParams.publicKey, addressParams.ca, addressParams.blocks, walletState.network!)
+    var p2wsh = getLockCaP2WSH(addressParams.publicKey, addressParams.ca, addressParams.blocks, walletState.network!)
     if (p2wsh.address != utxo.address) {
       if (addressParams.mpcPubKey) {
-        const p2wshV0 = getLockP2WSHV0(
+        const p2wshV0 = getLockCaP2WSHV0(
           addressParams.mpcPubKey,
           addressParams.publicKey,
           addressParams.ca,

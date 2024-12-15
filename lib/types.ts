@@ -14,3 +14,10 @@ export type Brc20Balance = {
 
 export const Networks = ['testnet', 'livenet', 'signet', 'devnet', 'testnet4'] as const
 export type Network = (typeof Networks)[number]
+
+// Token price types
+export interface TokenPrice {
+  id: string
+  price: number
+  timestamp: number
+}

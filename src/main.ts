@@ -224,6 +224,7 @@ export class AppMain extends LitElement {
                         class="bg-gray-800 rounded-lg text-sm p-2 cursor-pointer hover:bg-gray-700 transition-colors flex flex-col gap-1"
                         @click=${() => {
                           this.memeDialog.value!.ca = meme.ca
+                          this.memeDialog.value!.meta = { id: meme.ca, ...meme }
                           this.memeDialog.value!.show()
                         }}
                       >

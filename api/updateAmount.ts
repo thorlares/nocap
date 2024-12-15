@@ -1,4 +1,4 @@
-import { getLockAddress } from '../lib/lockAddress.js'
+import { getLockCaAddress } from '../lib/lockAddress.js'
 import { mempoolApiUrl } from '../lib/utils.js'
 import { getJson } from '../lib/fetch.js'
 import { createKysely } from '@vercel/postgres-kysely'
@@ -13,7 +13,7 @@ export function POST(request: Request) {
     .json()
     .then((params) => {
       const { publicKey, blocks, ca, network } = params
-      const lockAddress = getLockAddress(publicKey, ca, blocks, network)
+      const lockAddress = getLockCaAddress(publicKey, ca, blocks, network)
       return fetch(mempoolApiUrl(`/api/address/${lockAddress}`, network))
         .then(getJson)
         .then((result) => {
