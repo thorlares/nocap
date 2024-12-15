@@ -19,6 +19,10 @@ import './components/meme-dialog.ts'
 import { MemeDialog } from './components/meme-dialog'
 import { walletState } from './lib/walletState'
 import { formatUnits } from '@ethersproject/units'
+import { consume } from '@lit/context'
+import { walletContext } from './lib/walletState'
+import './components/dashborad/dialog'
+import { DashboardDialog } from './components/dashborad/dialog'
 
 setBasePath(import.meta.env.MODE === 'development' ? 'node_modules/@shoelace-style/shoelace/dist' : '/')
 
@@ -29,6 +33,10 @@ export class AppMain extends LitElement {
   @state() lastCreateAnim: Ref<SlAnimation> = createRef<SlAnimation>()
   @state() topMemes?: any[]
   private memeDialog: Ref<MemeDialog> = createRef()
+  private dashboardDialog: Ref<DashboardDialog> = createRef()
+  @consume({ context: walletContext.address, subscribe: true })
+  @state()
+  private address?: string
 
   connectedCallback(): void {
     super.connectedCallback()
@@ -124,9 +132,17 @@ export class AppMain extends LitElement {
   render() {
     return html`
       <meme-dialog ${ref(this.memeDialog)}></meme-dialog>
+      <dashboard-dialog ${ref(this.dashboardDialog)}></dashboard-dialog>
       <nav class="flex flex-wrap justify-between w-full p-2 items-center">
         <div class="flex flex-col gap-0.4 items-end md:order-last">
           <connect-button></connect-button>
+          ${when(
+            this.address,
+            () =>
+              html`<sl-button variant="text" size="small" @click=${() => this.dashboardDialog.value?.show()}
+                >[dashboard]</sl-button
+              >`
+          )}
         </div>
         <div class="flex items-center flex-wrap mr-4">
           <div class="flex gap-2">

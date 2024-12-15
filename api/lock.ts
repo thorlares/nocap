@@ -1,12 +1,12 @@
 import { kv } from '@vercel/kv'
-import { getLockAddress } from '../lib/lockAddress.js'
+import { getLockCaAddress } from '../lib/lockAddress.js'
 
 export function POST(request: Request) {
   return request
     .json()
     .then((params) => {
       const { address, publicKey, blocks, ca, network } = params
-      const lockAddress = getLockAddress(publicKey, ca, blocks, network)
+      const lockAddress = getLockCaAddress(publicKey, ca, blocks, network)
       return (
         kv
           .multi()

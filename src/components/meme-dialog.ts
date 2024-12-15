@@ -24,7 +24,7 @@ import { walletState } from '../lib/walletState'
 import { btcNetwork } from '../../lib/network'
 import { toXOnlyU8 } from '../../lib/utils'
 import { ensureSuccess, getJson } from '../../lib/fetch'
-import { toast, toastError, toastImportant } from './toast'
+import { toast, toastError, toastImportant, toastImportantError } from './toast'
 import { getLockCaAddress, getLockCaAddressV0, getLockCaP2WSH, getLockCaP2WSHV0 } from '../../lib/lockAddress'
 import { formatUnits } from '@ethersproject/units'
 import { networks, payments, Psbt, script } from 'bitcoinjs-lib'
@@ -106,22 +106,29 @@ export class MemeDialog extends LitElement {
       fetch(`/api/token?address=${this.ca}`)
         .then(getJson)
         .then((meta) => {
-          if (meta.id == this.ca) this.meta = meta
+          if (meta.id == this.ca) {
+            this.meta = meta
+            this.updatePrice()
+            this.updateLockDetails()
+          }
         })
-        .catch((e) => toastError(e, 'Failed to get coin details'))
+        .catch((e) => toastImportantError(e, 'Failed to get coin details'))
     }
-    if (this.price?.id != this.ca) {
-      this.price = undefined
-      // update price
-      fetch(`/api/price?address=${this.ca}`)
-        .then(getJson)
-        .then((price) => {
-          if (price.id == this.ca) this.price = price
-        })
-        .catch(console.warn)
-
+    if (this.meta && this.price?.id != this.ca) {
+      this.updatePrice()
       this.updateLockDetails()
     }
+  }
+
+  private updatePrice() {
+    this.price = undefined
+    // update price
+    fetch(`/api/price?address=${this.ca}`)
+      .then(getJson)
+      .then((price) => {
+        if (price.id == this.ca) this.price = price
+      })
+      .catch(console.warn)
   }
 
   hide() {
@@ -243,7 +250,22 @@ export class MemeDialog extends LitElement {
     return html`
       <sl-dialog label="Fetching Coin Details" ${ref(this.dialog)}>
         ${when(
-          this.meta,
+          !this.meta,
+          () => html`
+            <div class="animate-pulse flex space-x-4">
+              <div class="rounded-full bg-slate-600 h-10 w-10"></div>
+              <div class="flex-1 space-y-6 py-1">
+                <div class="h-2 bg-slate-600 rounded"></div>
+                <div class="space-y-3">
+                  <div class="grid grid-cols-3 gap-4">
+                    <div class="h-2 bg-slate-600 rounded col-span-2"></div>
+                    <div class="h-2 bg-slate-600 rounded col-span-1"></div>
+                  </div>
+                  <div class="h-2 bg-slate-600 rounded"></div>
+                </div>
+              </div>
+            </div>
+          `,
           () => html`
             <p slot="label">${this.meta.name}</p>
             <div class="max-h-[300px] overflow-hidden h-fit p-2 flex gap-2 w-full text-gray-400">
@@ -438,122 +460,115 @@ OP_ENDIF
               </sl-tab-panel>
               <sl-tab-panel name="BRC20" class="bg-neutral-900 px-3"><brc20-lock></brc20-lock></sl-tab-panel>
             </sl-tab-group>
-          `,
-          () => html`
-            <div class="animate-pulse flex space-x-4">
-              <div class="rounded-full bg-slate-600 h-10 w-10"></div>
-              <div class="flex-1 space-y-6 py-1">
-                <div class="h-2 bg-slate-600 rounded"></div>
-                <div class="space-y-3">
-                  <div class="grid grid-cols-3 gap-4">
-                    <div class="h-2 bg-slate-600 rounded col-span-2"></div>
-                    <div class="h-2 bg-slate-600 rounded col-span-1"></div>
+
+            <!-- locking steps dialog -->
+            <sl-dialog
+              no-header
+              class="[&::part(body)]:p-0 [&::part(overlay)]:bg-[rgba(0,0,0,0.8)]"
+              ${ref(this.dialogStep)}
+              @sl-request-close=${(event: CustomEvent) => {
+                if (event.detail.source === 'overlay') event.preventDefault()
+              }}
+            >
+              <sl-alert
+                ?closable=${this.lockDialogClosable}
+                open
+                class="[&::part(close-button)]:items-start [&::part(close-button)]:mt-3"
+                @sl-after-hide=${(e: CustomEvent) => (
+                  (e.currentTarget as HTMLElement).setAttribute('open', 'true'), this.dialogStep.value?.hide()
+                )}
+              >
+                ${when(
+                  this.lockDialogError,
+                  (err) =>
+                    html`
+                      <div class="flex gap-2">
+                        <sl-icon
+                          name="exclamation-circle"
+                          class="flex-none mt-0.5 text-rose-500"
+                          style="font-size: 1.1rem;"
+                        ></sl-icon>
+                        <p class="text-[var(--sl-color-neutral-800)]">${err.message}</p>
+                      </div>
+                    `,
+                  () => html`<p>3 Steps to go</p>`
+                )}
+                <sl-divider></sl-divider>
+                <div class="flex gap-2 ${when(this.lockDialogStep != 1, () => 'text-neutral-500')}">
+                  <sl-icon
+                    .name=${this.lockDialogStep == 1
+                      ? 'circle'
+                      : this.lockDialogHasInscription
+                      ? 'check-circle'
+                      : 'x-circle'}
+                    class="flex-none mt-1 ${when(this.lockDialogStep == 1, () => 'animate-pulse text-sky-500')}"
+                    style="font-size: 1.1qrem;"
+                  ></sl-icon>
+                  <div class="flex-1">
+                    <p>
+                      Has inscription?
+                      ${when(this.lockDialogStep != 1, () => (this.lockDialogHasInscription ? 'Yes' : 'No'))}
+                    </p>
                   </div>
-                  <div class="h-2 bg-slate-600 rounded"></div>
                 </div>
-              </div>
-            </div>
+                <sl-divider></sl-divider>
+                <div class="flex gap-2 ${when(this.lockDialogStep != 2, () => 'text-neutral-500')}">
+                  <sl-icon
+                    name="1-circle"
+                    class="flex-none mt-1 ${when(this.lockDialogStep == 2, () => 'animate-pulse text-sky-500')}"
+                    style="font-size: 1.1qrem;"
+                  ></sl-icon>
+                  <div class="flex-1">
+                    <p>
+                      Creating an inscription to store information in locking script.
+                      ${when(
+                        this.lockDialogStep == 2,
+                        () => html`<br />Data:
+                          <span class="font-mono break-all text-xs bg-[var(--sl-color-neutral-200)]">
+                            v1|${this.publicKey}|${this.lockingBlocks}|${this.ca}</span
+                          ><br />Format:
+                          <span class="font-mono break-all text-xs bg-[var(--sl-color-neutral-200)]"
+                            >&lt;version&gt;|&lt;YourPublicKey&gt;|&lt;Blocks&gt;|&lt;CoinAddress&gt;</span
+                          ><br />Inscription address:
+                          <span class="font-mono text-xs break-all bg-[var(--sl-color-neutral-200)]"
+                            >${this.p2trInscription?.address}</span
+                          >`
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <sl-divider></sl-divider>
+                <div class="flex gap-2 ${when(this.lockDialogStep != 3, () => 'text-neutral-500')}">
+                  <sl-icon
+                    name="2-circle"
+                    class="flex-none mt-1 ${when(this.lockDialogStep == 3, () => 'animate-pulse text-sky-500')}"
+                    style="font-size: 1.1qrem;"
+                  ></sl-icon>
+                  <div class="flex-1">
+                    <p class="break-all">
+                      Revealing the inscription to your address:
+                      <span class="font-mono text-xs bg-[var(--sl-color-neutral-200)]">${this.address}</span>
+                    </p>
+                  </div>
+                </div>
+                <sl-divider></sl-divider>
+                <div class="flex gap-2 ${when(this.lockDialogStep != 4, () => 'text-neutral-500')}">
+                  <sl-icon
+                    name="3-circle"
+                    class="flex-none mt-1 ${when(this.lockDialogStep == 4, () => 'animate-pulse text-sky-500')}"
+                    style="font-size: 1.1qrem;"
+                  ></sl-icon>
+                  <div class="flex-1">
+                    <p class="break-all">
+                      Locking bitcoin to self-custody address:
+                      <span class="font-mono text-xs bg-[var(--sl-color-neutral-200)]">${this.getLockAddress}</span>
+                    </p>
+                  </div>
+                </div>
+              </sl-alert>
+            </sl-dialog>
           `
         )}
-      </sl-dialog>
-      <!-- locking steps dialog -->
-      <sl-dialog
-        no-header
-        class="[&::part(body)]:p-0 [&::part(overlay)]:bg-[rgba(0,0,0,0.8)]"
-        ${ref(this.dialogStep)}
-        @sl-request-close=${(event: CustomEvent) => {
-          if (event.detail.source === 'overlay') event.preventDefault()
-        }}
-      >
-        <sl-alert
-          ?closable=${this.lockDialogClosable}
-          open
-          class="[&::part(close-button)]:items-start [&::part(close-button)]:mt-3"
-          @sl-after-hide=${(e: CustomEvent) => (
-            (e.currentTarget as HTMLElement).setAttribute('open', 'true'), this.dialogStep.value?.hide()
-          )}
-        >
-          ${when(
-            this.lockDialogError,
-            (err) =>
-              html`
-                <div class="flex gap-2">
-                  <sl-icon
-                    name="exclamation-circle"
-                    class="flex-none mt-0.5 text-rose-500"
-                    style="font-size: 1.1rem;"
-                  ></sl-icon>
-                  <p class="text-[var(--sl-color-neutral-800)]">${err.message}</p>
-                </div>
-              `,
-            () => html`<p>3 Steps to go</p>`
-          )}
-          <sl-divider></sl-divider>
-          <div class="flex gap-2 ${when(this.lockDialogStep != 1, () => 'text-neutral-500')}">
-            <sl-icon
-              .name=${this.lockDialogStep == 1 ? 'circle' : this.lockDialogHasInscription ? 'check-circle' : 'x-circle'}
-              class="flex-none mt-1 ${when(this.lockDialogStep == 1, () => 'animate-pulse text-sky-500')}"
-              style="font-size: 1.1qrem;"
-            ></sl-icon>
-            <div class="flex-1">
-              <p>
-                Has inscription? ${when(this.lockDialogStep != 1, () => (this.lockDialogHasInscription ? 'Yes' : 'No'))}
-              </p>
-            </div>
-          </div>
-          <sl-divider></sl-divider>
-          <div class="flex gap-2 ${when(this.lockDialogStep != 2, () => 'text-neutral-500')}">
-            <sl-icon
-              name="1-circle"
-              class="flex-none mt-1 ${when(this.lockDialogStep == 2, () => 'animate-pulse text-sky-500')}"
-              style="font-size: 1.1qrem;"
-            ></sl-icon>
-            <div class="flex-1">
-              <p>
-                Creating an inscription to store information in locking
-                script.${when(
-                  this.lockDialogStep == 2,
-                  () => html`<br />Data stored:
-                    <span class="font-mono break-all text-xs bg-[var(--sl-color-neutral-200)]">
-                      v1&lt;version&gt;|${this.publicKey}&lt;YourPublicKey&gt;|${this
-                        .lockingBlocks}&lt;Blocks&gt;|${this.ca}&lt;CoinAddress&gt;</span
-                    ><br />Inscription address:
-                    <span class="font-mono text-xs break-all bg-[var(--sl-color-neutral-200)]"
-                      >${this.p2trInscription?.address}</span
-                    >`
-                )}
-              </p>
-            </div>
-          </div>
-          <sl-divider></sl-divider>
-          <div class="flex gap-2 ${when(this.lockDialogStep != 3, () => 'text-neutral-500')}">
-            <sl-icon
-              name="2-circle"
-              class="flex-none mt-1 ${when(this.lockDialogStep == 3, () => 'animate-pulse text-sky-500')}"
-              style="font-size: 1.1qrem;"
-            ></sl-icon>
-            <div class="flex-1">
-              <p class="break-all">
-                Revealing the inscription to your address:
-                <span class="font-mono text-xs bg-[var(--sl-color-neutral-200)]">${this.address}</span>
-              </p>
-            </div>
-          </div>
-          <sl-divider></sl-divider>
-          <div class="flex gap-2 ${when(this.lockDialogStep != 4, () => 'text-neutral-500')}">
-            <sl-icon
-              name="3-circle"
-              class="flex-none mt-1 ${when(this.lockDialogStep == 4, () => 'animate-pulse text-sky-500')}"
-              style="font-size: 1.1qrem;"
-            ></sl-icon>
-            <div class="flex-1">
-              <p class="break-all">
-                Locking bitcoin to self-custody address:
-                <span class="font-mono text-xs bg-[var(--sl-color-neutral-200)]">${this.getLockAddress}</span>
-              </p>
-            </div>
-          </div>
-        </sl-alert>
       </sl-dialog>
     `
   }
