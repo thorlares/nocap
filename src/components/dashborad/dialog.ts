@@ -59,6 +59,9 @@ export class DashboardDialog extends LitElement {
         )
       )
       .then((promises) => Promise.all(promises))
+      .then(() => {
+        if (!this.coinsSupported) this.coinsSupported = []
+      })
       .catch((e) => toastImportantError(e, 'Failed to get coins supported'))
       .finally(() => (this.fetching = undefined))
   }
@@ -77,7 +80,9 @@ export class DashboardDialog extends LitElement {
               ${when(
                 this.coinsSupported,
                 (coinsSupported) =>
-                  map(coinsSupported, (coin) => html`<token-card ca=${coin.ca} amount=${coin.amount}></token-card>`),
+                  coinsSupported.length
+                    ? map(coinsSupported, (coin) => html`<token-card ca=${coin.ca} amount=${coin.amount}></token-card>`)
+                    : html`<div class="text-center">No coins supported yet</div>`,
                 () => html`<sl-skeleton effect="pulse"></sl-skeleton>`
               )}
             </div>
