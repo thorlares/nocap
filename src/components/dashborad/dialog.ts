@@ -10,7 +10,7 @@ import { walletContext, walletState } from '../../lib/walletState'
 import style from '/src/base.css?inline'
 import type SlDialog from '@shoelace-style/shoelace/dist/components/dialog/dialog.js'
 import { getJson } from '../../../lib/fetch'
-import { toastError } from '../toast'
+import { toastImportantError } from '../toast'
 import { when } from 'lit/directives/when.js'
 import { map } from 'lit/directives/map.js'
 import './token.js'
@@ -29,16 +29,19 @@ export class DashboardDialog extends LitElement {
   readonly address?: string
   @state() lockingBlocks = 10
 
+  private fetching?: Promise<any>
+
   show() {
     this.dialog.value?.show()
-
-    Promise.all([
+    if (this.fetching) return
+    this.coinsSupported = undefined
+    this.fetching = Promise.all([
       walletState.getPublicKey(),
       walletState.getNetwork(),
       fetch(`/api/tokensSupported?address=${this.address}`).then(getJson)
     ])
-      .then(([publicKey, network, tokens]) => {
-        tokens.forEach((token: any) => {
+      .then(([publicKey, network, tokens]) =>
+        tokens.map((token: any) =>
           fetch(
             `/api/lockedAmount?address=${token}&lock_address=${getLockCaAddress(
               publicKey,
@@ -53,9 +56,11 @@ export class DashboardDialog extends LitElement {
               if (amount > 0) this.coinsSupported = [...(this.coinsSupported ?? []), { ca: token, amount }]
             })
             .catch(console.warn)
-        })
-      })
-      .catch((e) => toastError(e, 'Failed to get coins supported'))
+        )
+      )
+      .then((promises) => Promise.all(promises))
+      .catch((e) => toastImportantError(e, 'Failed to get coins supported'))
+      .finally(() => (this.fetching = undefined))
   }
 
   hide() {
