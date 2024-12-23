@@ -240,7 +240,7 @@ export class Brc20Lock extends LitElement {
 
   private updateTransferable(ticker: string) {
     if (!this.address) throw new Error('Wallet not connected')
-    return fetch(`/api/brc20Transferable?address=${this.address}&ticker=${ticker}`)
+    return fetch(`/api/brc20?query=transferable&address=${this.address}&ticker=${ticker}`)
       .then(getJson)
       .then((data) => {
         console.debug('BRC20 Transferable from server:', this.address, ticker, data?.data ?? data)
@@ -254,7 +254,7 @@ export class Brc20Lock extends LitElement {
 
   private updateLocked(ticker: string) {
     return this.getLockAddress()
-      .then((lockAddress) => fetch(`/api/brc20Transferable?address=${lockAddress}&ticker=${ticker}`))
+      .then((lockAddress) => fetch(`/api/brc20?query=transferable&address=${lockAddress}&ticker=${ticker}`))
       .then(getJson)
       .then((data) => {
         console.debug('Locked Transferables from server:', this.address, ticker, data?.data ?? data)
@@ -269,7 +269,7 @@ export class Brc20Lock extends LitElement {
   public updateBalances() {
     if (!this.address) throw new Error('Wallet not connected')
     return Promise.all([
-      fetch(`/api/brc20Balance?address=${this.address}`)
+      fetch(`/api/brc20?query=balance&address=${this.address}`)
         .then(getJson)
         .then((data) => {
           console.debug('BRC20 Balance from server:', this.address, data?.data ?? data)
@@ -284,7 +284,7 @@ export class Brc20Lock extends LitElement {
           throw err
         }),
       this.getLockAddress()
-        .then((lockAddress) => fetch(`/api/brc20Balance?address=${lockAddress}`))
+        .then((lockAddress) => fetch(`/api/brc20?query=balance&address=${lockAddress}`))
         .then(getJson)
         .then((data) => {
           console.debug('Locked Balance from server:', this.lockAddress, data?.data ?? data)
