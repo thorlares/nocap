@@ -1,20 +1,25 @@
 import { VercelRequest, VercelResponse } from '@vercel/node'
 import { Markup, Telegraf } from 'telegraf'
+import d from 'debug'
+
+const debug = d('nc:tgbot')
 
 if (!process.env.TGBOT_TOKEN) throw new Error('TGBOT_TOKEN is not configured')
 
 const bot = new Telegraf(process.env.TGBOT_TOKEN)
 
 bot.command('start', (ctx) => {
-  if (ctx.payload) console.log(`invited by ${ctx.payload}`)
-  return ctx.reply(
-    "NoCap.Tips is the first app that rewards you for your holdings without any additional requirements. Let's go big! No Cap! 🚀",
-    Markup.inlineKeyboard([
-      [Markup.button.url('💰 Check My Holdings', 'https://nocap.tips')],
-      [Markup.button.callback('📈 My Profile', 'profile')],
-      [Markup.button.callback('📩 Get Invite Link', 'invite')]
-    ])
-  )
+  if (ctx.payload) debug(`invited by ${ctx.payload}`)
+  return ctx
+    .reply(
+      "NoCap.Tips is the first app that rewards you for your holdings without any additional requirements. Let's go big! No Cap! 🚀",
+      Markup.inlineKeyboard([
+        [Markup.button.url('💰 Check My Holdings', 'https://nocap.tips')],
+        [Markup.button.callback('📈 My Profile', 'profile')],
+        [Markup.button.callback('📩 Get Invite Link', 'invite')]
+      ])
+    )
+    .catch(console.error)
 })
 
 bot.action('profile', (ctx) => ctx.reply('https://nocap.tips'))

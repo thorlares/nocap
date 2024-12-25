@@ -9,7 +9,7 @@ import { setBasePath } from '@shoelace-style/shoelace/dist/utilities/base-path.j
 
 setBasePath(import.meta.env.MODE === 'development' ? 'node_modules/@shoelace-style/shoelace/dist' : '/')
 
-@customElement('app-main')
+@customElement('app-index')
 export class AppIndex extends LitElement {
   static styles = [unsafeCSS(baseStyle), unsafeCSS(style)]
 
