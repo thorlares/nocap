@@ -52,6 +52,7 @@ export class AppAirdrop extends LitElement {
       networks: [mainnet, solana],
       metadata,
       projectId,
+      enableWalletGuide: false,
       features: { email: false, socials: false },
       siweConfig
     })
