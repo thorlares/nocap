@@ -8,6 +8,10 @@
   "scripts": {
     "dev": "vite",
     "vercel-dev": "vercel dev",
+    "ngrok": "source .env && ngrok http --url=${BASE_PATH} 3000",
+    "vercel-ngrok": "concurrently --kill-others npm:vercel-dev npm:ngrok",
+    "tg-setwebhook": "dotenvx run -- node scripts/tg-setwebhook.js",
+    "tg-setwebhook:production": "NODE_ENV=production dotenvx run --convention=nextjs -- node scripts/tg-setwebhook.js",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "generateDbTypes": "NODE_TLS_REJECT_UNAUTHORIZED=0 kysely-codegen --out-file ./api_lib/db/types.ts"
@@ -39,11 +43,14 @@
     "moralis": "^2.27.2",
     "pg": "^8.13.1",
     "sats-connect-v1": "npm:sats-connect@1.0.0",
+    "telegraf": "^4.16.3",
     "varuint-bitcoin": "^2.0.0"
   },
   "devDependencies": {
+    "@dotenvx/dotenvx": "^1.31.3",
     "@types/node": "^22.9.1",
     "autoprefixer": "^10.4.20",
+    "concurrently": "^9.1.0",
     "kysely-codegen": "^0.17.0",
     "postcss-nesting": "^13.0.1",
     "tailwindcss": "^3.4.15",

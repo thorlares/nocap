@@ -477,6 +477,14 @@ export interface StorageS3MultipartUploadsParts {
   version: string;
 }
 
+export interface User {
+  eth_addresses: Json | null;
+  id: Generated<Int8>;
+  sol_addresses: Json | null;
+  tgid: Int8 | null;
+  tgusername: string | null;
+}
+
 export interface VaultDecryptedSecrets {
   created_at: Timestamp | null;
   decrypted_secret: string | null;
@@ -534,6 +542,7 @@ export interface DB {
   "storage.objects": StorageObjects;
   "storage.s3_multipart_uploads": StorageS3MultipartUploads;
   "storage.s3_multipart_uploads_parts": StorageS3MultipartUploadsParts;
+  user: User;
   "vault.decrypted_secrets": VaultDecryptedSecrets;
   "vault.secrets": VaultSecrets;
 }
