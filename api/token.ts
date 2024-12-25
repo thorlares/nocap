@@ -1,10 +1,13 @@
 import { kv } from '@vercel/kv'
 import { getJson } from '../lib/fetch.js'
+import { getPrice } from '../api_lib/actions/price.js'
 
 export function GET(request: Request) {
   const url = new URL(request.url)
   const address = url.searchParams.get('address')
   if (!address) return new Response('Coin address is required', { status: 400 })
+  const query = url.searchParams.get('query')
+  if (query == 'price') return getPrice(address)
 
   // Define cache key
   const metaCacheKey = `nc:token:${address}`

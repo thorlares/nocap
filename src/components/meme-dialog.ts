@@ -123,7 +123,7 @@ export class MemeDialog extends LitElement {
   private updatePrice() {
     this.price = undefined
     // update price
-    fetch(`/api/price?address=${this.ca}`)
+    fetch(`/api/token?query=price&address=${this.ca}`)
       .then(getJson)
       .then((price) => {
         if (price.id == this.ca) this.price = price

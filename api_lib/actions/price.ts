@@ -1,6 +1,6 @@
 import { kv } from '@vercel/kv'
 import Moralis from 'moralis'
-import { TokenPrice } from '../lib/types'
+import { TokenPrice } from '../../lib/types'
 
 // Initialize Moralis
 Moralis.start({
@@ -79,11 +79,7 @@ function getMoralisPrice(address: string): Promise<TokenPrice | null> {
     })
 }
 
-export function GET(request: Request) {
-  const url = new URL(request.url)
-  const address = url.searchParams.get('address')
-  if (!address) return new Response('Coin address is required', { status: 400 })
-
+export function getPrice(address: string) {
   // Define cache key
   const priceCacheKey = `token:price:${address}`
 
