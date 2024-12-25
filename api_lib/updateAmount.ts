@@ -11,7 +11,7 @@ export function updateAmount(address: string, ca: string, network: Network) {
       const confirmed = result.chain_stats.funded_txo_sum - result.chain_stats.spent_txo_sum
       const unconfirmed = result.mempool_stats.funded_txo_sum - result.mempool_stats.spent_txo_sum
 
-      return createKysely<DB>({ connectionString: process.env.DATABASE_URL })
+      return createKysely<DB>({ connectionString: process.env.POSTGRES_URL })
         .updateTable(network == 'livenet' ? 'locked_amounts' : 'locked_amounts_testnet')
         .set({ confirmed, unconfirmed, last_update: new Date() })
         .where('ca', '=', ca)

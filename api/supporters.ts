@@ -5,8 +5,8 @@ import { sql } from 'kysely'
 import { Network } from '../lib/types.js'
 
 export function GET(request: Request) {
-  if (!process.env.DATABASE_URL) {
-    console.error('DATABASE_URL is not configured', 'DATABASE_URL', process.env.DATABASE_URL)
+  if (!process.env.POSTGRES_URL) {
+    console.error('POSTGRES_URL is not configured', 'POSTGRES_URL', process.env.POSTGRES_URL)
     return new Response('Server is not properly configured', { status: 500 })
   }
 
@@ -15,7 +15,7 @@ export function GET(request: Request) {
   if (!address) return new Response('Coin address is required', { status: 400 })
   const network = (url.searchParams.get('network') ?? 'livenet') as Network
 
-  const db = createKysely<DB>({ connectionString: process.env.DATABASE_URL })
+  const db = createKysely<DB>({ connectionString: process.env.POSTGRES_URL })
   return (
     // update top 12 outdated addresses
     db

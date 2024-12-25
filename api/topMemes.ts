@@ -4,15 +4,15 @@ import { sql } from 'kysely'
 import { kv } from '@vercel/kv'
 
 export function GET(request: Request) {
-  if (!process.env.DATABASE_URL) {
-    console.error('DATABASE_URL is not configured', 'DATABASE_URL', process.env.DATABASE_URL)
+  if (!process.env.POSTGRES_URL) {
+    console.error('POSTGRES_URL is not configured', 'POSTGRES_URL', process.env.POSTGRES_URL)
     return new Response('Server is not properly configured', { status: 500 })
   }
 
   const url = new URL(request.url)
   const network = url.searchParams.get('network') ?? 'livenet'
 
-  return createKysely<DB>({ connectionString: process.env.DATABASE_URL })
+  return createKysely<DB>({ connectionString: process.env.POSTGRES_URL })
     .selectFrom((eb) =>
       eb
         .selectFrom(network == 'livenet' ? 'locked_amounts' : 'locked_amounts_testnet')
