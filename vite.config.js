@@ -9,10 +9,9 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),
-        airdrop: resolve(__dirname, 'airdrop.html'),
-        brc20_index: resolve(__dirname, 'brc20/index.html'),
-        brc20: resolve(__dirname, 'brc20.html'),
-        meme: resolve(__dirname, 'meme.html')
+        airdrop: resolve(__dirname, 'airdrop/index.html'),
+        brc20: resolve(__dirname, 'brc20/index.html'),
+        meme: resolve(__dirname, 'meme/index.html')
       }
     }
   },

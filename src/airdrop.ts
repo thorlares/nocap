@@ -16,7 +16,7 @@ import { mainnet, solana } from '@reown/appkit/networks'
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
 import { createSIWE } from './lib/siweUtils'
 
-setBasePath(import.meta.env.MODE === 'development' ? 'node_modules/@shoelace-style/shoelace/dist' : '/')
+setBasePath(import.meta.env.MODE === 'development' ? '/node_modules/@shoelace-style/shoelace/dist' : '/')
 
 @customElement('app-airdrop')
 export class AppAirdrop extends LitElement {

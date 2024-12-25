@@ -60,7 +60,7 @@ async function handleAuthCallback(url: URL) {
       return new Response(JSON.stringify({ userId, screenName }), {
         headers: {
           'set-cookie': `x=${token}; ${cookieOptions}`,
-          Location: `${process.env.BASE_PATH}/airdrop`
+          Location: `${process.env.BASE_PATH}/airdrop/`
         },
         status: 302
       })
