@@ -1,22 +1,29 @@
 import { VercelRequest, VercelResponse } from '@vercel/node'
 import { Markup, Telegraf } from 'telegraf'
 import d from 'debug'
+import { SignJWT } from 'jose'
 
 const debug = d('nc:tgbot')
+const secretKey = new TextEncoder().encode(process.env.JWT_SECRET!)
 
 if (!process.env.TGBOT_TOKEN) throw new Error('TGBOT_TOKEN is not configured')
 
 const bot = new Telegraf(process.env.TGBOT_TOKEN)
 
-bot.command('start', (ctx) => {
-  if (ctx.payload) debug(`invited by ${ctx.payload}`)
+bot.command('start', async (ctx) => {
+  if (ctx.payload) debug('invited by %o', ctx.payload)
+  const token = await new SignJWT({ id: ctx.from.id, username: ctx.from.username })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setExpirationTime('7d')
+    .setIssuedAt()
+    .sign(secretKey)
   return ctx
     .reply(
       "NoCap.Tips is the first app that rewards you for your holdings without any additional requirements. Let's go big! No Cap! 🚀",
       Markup.inlineKeyboard([
-        [Markup.button.url('💰 Check My Holdings', 'https://nocap.tips')],
-        [Markup.button.callback('📈 My Profile', 'profile')],
-        [Markup.button.callback('📩 Get Invite Link', 'invite')]
+        [Markup.button.webApp('💰 Check My Holdings', `${process.env.VITE_BASE_PATH}/airdrop/`)]
+        // [Markup.button.callback('📈 My Profile', 'profile')],
+        // [Markup.button.callback('📩 Get Invite Link', 'invite')]
       ])
     )
     .catch(console.error)

@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "vite",
     "vercel-dev": "vercel dev",
-    "ngrok": "source .env && ngrok http --url=${BASE_PATH} 3000",
+    "ngrok": "source .env && ngrok http --url=${VITE_BASE_PATH} 3000",
     "vercel-ngrok": "concurrently --kill-others npm:vercel-dev npm:ngrok",
     "tg-setwebhook": "dotenvx run -- node scripts/tg-setwebhook.js",
     "tg-setwebhook:production": "NODE_ENV=production dotenvx run --convention=nextjs -- node scripts/tg-setwebhook.js",
@@ -25,6 +25,7 @@
     "@lit-app/state": "^1.0.0",
     "@lit/context": "^1.1.3",
     "@noble/hashes": "^1.5.0",
+    "@okxconnect/ui": "^1.6.2",
     "@reown/appkit": "^1.6.2",
     "@reown/appkit-adapter-wagmi": "^1.6.2",
     "@reown/appkit-siwe": "^1.6.2",
