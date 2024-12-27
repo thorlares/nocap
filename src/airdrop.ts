@@ -10,14 +10,15 @@ import '@shoelace-style/shoelace/dist/components/icon/icon.js'
 import '@shoelace-style/shoelace/dist/components/skeleton/skeleton.js'
 import { setBasePath } from '@shoelace-style/shoelace/dist/utilities/base-path.js'
 import { when } from 'lit/directives/when.js'
-import { getJson } from '../lib/fetch'
-import { createAppKit } from '@reown/appkit'
-import { mainnet, solana } from '@reown/appkit/networks'
-import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
-import { createSIWE } from './lib/siweUtils'
-import { getAddressFromMessage, getChainIdFromMessage, verifySignature } from '@reown/appkit-siwe'
+import { ensureSuccess, getJson } from '../lib/fetch'
+// import { createAppKit } from '@reown/appkit'
+// import { mainnet, solana } from '@reown/appkit/networks'
+// import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
+// import { createSIWE } from './lib/siweUtils'
+// import { getAddressFromMessage, getChainIdFromMessage, verifySignature } from '@reown/appkit-siwe'
 import { map } from 'lit/directives/map.js'
-import { OKXUniversalConnectUI } from '@okxconnect/ui'
+import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils'
+import { toastImportantError } from './components/toast'
 
 setBasePath(import.meta.env.MODE === 'development' ? '/node_modules/@shoelace-style/shoelace/dist' : '/')
 
@@ -26,6 +27,7 @@ export class AppAirdrop extends LitElement {
   static styles = [unsafeCSS(baseStyle), unsafeCSS(style)]
   @state() private auth: any
   @state() private addresses: any
+  @state() private connectedAddress: any
 
   private universalUi: any
 
@@ -36,60 +38,73 @@ export class AppAirdrop extends LitElement {
   }
 
   private initWalletConnect() {
-    OKXUniversalConnectUI.init({
-      dappMetaData: { name: 'NoCap.Tips', icon: `${import.meta.env.VITE_BASE_PATH}/apple-touch-icon.png` }
-    }).then((ui) => (this.universalUi = ui))
-
-    const projectId = import.meta.env.VITE_REOWN_PROJECT_ID
-
-    const networks = [mainnet, solana]
-
-    const wagmiAdapter = new WagmiAdapter({
-      projectId,
-      networks
-    })
-    console.log(import.meta.env.VITE_BASE_PATH)
-    const metadata = {
-      name: 'NoCap.Tips',
-      description: 'nocap.tips',
-      url: import.meta.env.VITE_BASE_PATH, // origin must match your domain & subdomain
-      icons: ['https://nocap.tips/favicon.svg']
-    }
-
-    const siweConfig = createSIWE(
-      async () => ({
-        domain: 'nocap.tips',
-        uri: window.location.origin,
-        statement: `And connect with X account @${this.auth.screenName}`,
-        chains: [1]
-      }),
-      async ({ message, signature }) => {
-        const address = getAddressFromMessage(message)
-        let chainId = getChainIdFromMessage(message)
-
-        const isValid = await verifySignature({
-          address,
-          message,
-          signature,
-          chainId,
-          projectId
+    import('@okxconnect/ui')
+      .then(({ OKXUniversalConnectUI }) =>
+        OKXUniversalConnectUI.init({
+          dappMetaData: { name: 'NoCap.Tips', icon: `${import.meta.env.VITE_BASE_PATH}/apple-touch-icon.png` },
+          actionsConfiguration: {
+            returnStrategy: 'tg://resolve',
+            modals: 'all',
+            tmaReturnUrl: 'back'
+          }
         })
+      )
+      .then((ui) => {
+        this.universalUi = ui
+        if (ui.connected()) ui.disconnect()
+        ui.on('session_delete', () => (this.connectedAddress = undefined))
+      })
 
-        if (!isValid) return false
-        this.addresses = [...this.addresses, address]
-        return true
-      }
-    )
+    // const projectId = import.meta.env.VITE_REOWN_PROJECT_ID
 
-    createAppKit({
-      adapters: [wagmiAdapter],
-      networks: [mainnet, solana],
-      metadata,
-      projectId,
-      enableWalletGuide: false,
-      features: { email: false, socials: false },
-      siweConfig
-    })
+    // const networks = [mainnet, solana]
+
+    // const wagmiAdapter = new WagmiAdapter({
+    //   projectId,
+    //   networks
+    // })
+    // console.log(import.meta.env.VITE_BASE_PATH)
+    // const metadata = {
+    //   name: 'NoCap.Tips',
+    //   description: 'nocap.tips',
+    //   url: import.meta.env.VITE_BASE_PATH, // origin must match your domain & subdomain
+    //   icons: ['https://nocap.tips/favicon.svg']
+    // }
+
+    // const siweConfig = createSIWE(
+    //   async () => ({
+    //     domain: 'nocap.tips',
+    //     uri: window.location.origin,
+    //     statement: `And connect with X account @${this.auth.screenName}`,
+    //     chains: [1]
+    //   }),
+    //   async ({ message, signature }) => {
+    //     const address = getAddressFromMessage(message)
+    //     let chainId = getChainIdFromMessage(message)
+
+    //     const isValid = await verifySignature({
+    //       address,
+    //       message,
+    //       signature,
+    //       chainId,
+    //       projectId
+    //     })
+
+    //     if (!isValid) return false
+    //     this.addresses = [...this.addresses, address]
+    //     return true
+    //   }
+    // )
+
+    // createAppKit({
+    //   adapters: [wagmiAdapter],
+    //   networks: [mainnet, solana],
+    //   metadata,
+    //   projectId,
+    //   enableWalletGuide: false,
+    //   features: { email: false, socials: false },
+    //   siweConfig
+    // })
   }
 
   private loadAuth() {
@@ -111,7 +126,7 @@ export class AppAirdrop extends LitElement {
   render() {
     return html`
       <main class="flex flex-col justify-center h-dvh bg-[#333536]">
-        <div class="flex flex-col gap-4 self-center max-w-96 px-2">
+        <div class="flex flex-col gap-4 self-center max-w-96 px-2 pb-10">
           <img src="/favicon.svg" alt="NoCap.Tips" class="w-40 h-40 self-center" />
           <div class="flex gap-2">
             <span class="text-2xl min-w-6">💰</span>
@@ -155,38 +170,102 @@ export class AppAirdrop extends LitElement {
               () => html`<div class="animate-pulse w-16 h-2 bg-slate-600 rounded"></div>`
             )} -->
           </div>
-          <div class="flex gap-2 items-center">
+          <div class="flex gap-2">
             <sl-icon name="wallet"></sl-icon>
             <div>
               ${when(
                 this.addresses,
                 (addresses) => html`
                   <ul>
-                    ${map(addresses, (address) => html`<li>${address}</li>`)}
+                    ${map(
+                      addresses,
+                      (address: string) =>
+                        html`<li>${address.substring(0, 8)}...${address.substring(address.length - 6)}</li>`
+                    )}
                   </ul>
+                `
+              )}
+              ${when(
+                this.connectedAddress,
+                (address) => html`
+                  ${address.substring(0, 8)}...${address.substring(address.length - 6)}
+                  <sl-spinner class="text-xs ml-1"></sl-spinner>
                 `
               )}
               ${when(
                 this.auth,
                 (auth) => {
                   if (!auth.x && !auth.tg) return 'Connect your telegram or X account to continue'
-                  return html`<sl-button
+                  if (!this.connectedAddress)
+                    return html`<sl-button
                       variant="primary"
                       size="small"
                       pill
                       outline
-                      @click=${() => this.universalUi.openModal()}
+                      @click=${() => this.connectWallet()}
                       >Connect</sl-button
-                    >
-                    <appkit-connect-button size="sm"></appkit-connect-button>`
+                    >`
+                  return html`<sl-button
+                    variant="primary"
+                    size="small"
+                    pill
+                    outline
+                    @click=${() => this.universalUi.disconnect()}
+                    >Disconnect</sl-button
+                  >`
                 },
-                () => html`<div class="animate-pulse w-16 h-2 bg-slate-600 rounded"></div>`
+                () => html`<div class="animate-pulse w-16 h-2 bg-slate-600 rounded mt-2"></div>`
               )}
             </div>
           </div>
         </div>
       </main>
     `
+  }
+
+  private connectWallet() {
+    const expire = new Date(Date.now() + 10 * 60 * 1000)
+    const nonce = bytesToHex(crypto.getRandomValues(new Uint8Array(8)))
+    const message =
+      '0x' +
+      bytesToHex(
+        utf8ToBytes(
+          `Sign this message to allow connecting your wallet address with telegram account @${
+            this.auth.tg.username
+          } on NoCap.Tips\n\nTelegram account: ${this.auth.tg.username}(${
+            this.auth.tg.id
+          })\nExpires At: ${expire.toISOString()}\nNonce: ${nonce}`
+        )
+      )
+    return this.universalUi
+      .openModalAndSign({ namespaces: { eip155: { chains: ['eip155:1'] } } }, [
+        {
+          method: 'personal_sign',
+          chainId: 'eip155:1',
+          params: [message]
+        }
+      ])
+      .then((arg: any) => (console.log(arg), arg))
+      .then(({ namespaces, signResponse }: any) => {
+        this.connectedAddress = namespaces['eip155'].accounts[0].split(':')[2]
+        fetch('/api/airdrop?action=connectEth', {
+          method: 'POST',
+          body: JSON.stringify({
+            address: this.connectedAddress,
+            signature: signResponse[0].result,
+            expire: expire.getTime(),
+            nonce
+          })
+        })
+          .then(ensureSuccess)
+          .then(() => {
+            this.connectedAddress = undefined
+            this.universalUi.disconnect()
+          })
+          .catch((error) => {
+            toastImportantError(error, 'Failed to connect wallet address')
+          })
+      })
   }
 }
 

@@ -3,10 +3,12 @@ import { kv } from '@vercel/kv'
 import { SignJWT, jwtVerify } from 'jose'
 import d from 'debug'
 import { createHmac } from 'node:crypto'
+import { verifyMessage } from 'viem'
 
 const debug = d('nc:airdrop')
 
-const secretKey = new TextEncoder().encode(process.env.JWT_SECRET!)
+const JWT_SECRET_KEY = new TextEncoder().encode(process.env.JWT_SECRET!)
+const COOKIE_OPTIONS = 'Path=/; Max-Age=604800; HttpOnly'
 
 if (!process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET is not configured')
@@ -35,7 +37,7 @@ async function handleAuth(request: Request) {
 
   if (token_x) {
     debug('x token: %o', token_x)
-    result.x = (await jwtVerify(token_x, secretKey))?.payload
+    result.x = (await jwtVerify(token_x, JWT_SECRET_KEY))?.payload
     debug('jwt result: %o', result.x)
   }
 
@@ -52,7 +54,20 @@ async function handleAuth(request: Request) {
       result.tg = { id: tgUser.id, username: tgUser.username }
     }
   }
-  return new Response(JSON.stringify(result))
+  return new Response(
+    JSON.stringify(result),
+    result.tg
+      ? {
+          headers: {
+            'set-cookie': `tg=${await new SignJWT(result.tg)
+              .setProtectedHeader({ alg: 'HS256' })
+              .setExpirationTime('7d')
+              .setIssuedAt()
+              .sign(JWT_SECRET_KEY)}; ${COOKIE_OPTIONS}`
+          }
+        }
+      : undefined
+  )
 }
 
 async function handleAuthX() {
@@ -82,11 +97,10 @@ async function handleAuthXCallback(url: URL) {
         .setProtectedHeader({ alg: 'HS256' })
         .setExpirationTime('7d')
         .setIssuedAt()
-        .sign(secretKey)
-      const cookieOptions = 'Path=/; Max-Age=604800; HttpOnly'
+        .sign(JWT_SECRET_KEY)
       return new Response('Auth succeeded, returning to https://nocap.tips/airdrop', {
         headers: {
-          'set-cookie': `x=${token}; ${cookieOptions}`,
+          'set-cookie': `x=${token}; ${COOKIE_OPTIONS}`,
           Location: `${process.env.VITE_BASE_PATH}/airdrop/`
         },
         status: 302
@@ -99,7 +113,7 @@ async function handleAuthTelegram(url: URL) {
   const token = url.searchParams.get('token')
 
   debug('tg token: %o', token)
-  const result = await jwtVerify(token!, secretKey)
+  const result = await jwtVerify(token!, JWT_SECRET_KEY)
   debug('jwt result: %o', result)
   if (!result) return new Response('Bad token', { status: 500 })
 
@@ -113,14 +127,35 @@ async function handleAuthTelegram(url: URL) {
   })
 }
 
+async function handleConnectEth(request: Request) {
+  const cookies = request.headers.get('cookie')?.split(';')
+  const token_tg = cookies?.find((c) => c.trim().startsWith('tg='))?.split('=')?.[1]
+
+  const result = await jwtVerify(token_tg!, JWT_SECRET_KEY)
+  if (!result) return new Response('Bad telegram account', { status: 500 })
+
+  const { address, expire, nonce, signature } = await request.json()
+
+  if (expire < Date.now()) return new Response('Signature expired', { status: 400 })
+
+  const message = `Sign this message to allow connecting your wallet address \
+with telegram account @${result.payload.username} on NoCap.Tips\n\n\
+Telegram account: ${result.payload.username}(${result.payload.id})\n\
+Expires At: ${new Date(expire).toISOString()}\nNonce: ${nonce}`
+  if (!(await verifyMessage({ address, message, signature }))) return new Response('Bad signature', { status: 400 })
+  return new Response('OK')
+}
+
 export async function POST(request: Request) {
   const url = new URL(request.url)
   const action = url.searchParams.get('action')
 
   try {
     if (action == 'auth') return await handleAuth(request)
-    else return new Response('', { status: 400 })
+    else if (action == 'connectEth') return await handleConnectEth(request)
+    else return new Response('Bad request', { status: 400 })
   } catch (e: any) {
+    console.error(e)
     return new Response(e?.message ?? e, { status: 500 })
   }
 }
@@ -134,8 +169,9 @@ export async function GET(request: Request) {
     else if (action == 'authcb') return await handleAuthXCallback(url)
     else if (action == 'authx') return await handleAuthX()
     else if (action == 'authtg') return await handleAuthTelegram(url)
-    else return new Response('', { status: 400 })
+    else return new Response('Bad request', { status: 400 })
   } catch (e: any) {
+    console.error(e)
     return new Response(e?.message ?? e, { status: 500 })
   }
 }
