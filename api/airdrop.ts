@@ -168,7 +168,7 @@ export async function getAddresses(tgid: any) {
     .select('address')
     .where('uid', '=', (qb) => qb.selectFrom('user').select('id').where('tgid', '=', tgid))
     .execute()
-  debug('tg id: %o, addresses', tgid, addressesResult)
+  debug('tg id: %o, addresses %o', tgid, addressesResult)
   return addressesResult
 }
 

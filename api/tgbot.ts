@@ -2,6 +2,8 @@ import { VercelRequest, VercelResponse } from '@vercel/node'
 import { Markup, Telegraf } from 'telegraf'
 import d from 'debug'
 import { getAddresses } from './airdrop.js'
+import { getEthBalances } from '../api_lib/ethBalance.js'
+import { formatUnits } from 'viem'
 
 const debug = d('nc:tgbot')
 
@@ -25,19 +27,31 @@ bot.command('start', async (ctx) => {
 
 bot.action('profile', async (ctx) => {
   const thread = await ctx.reply('Loading')
-  const addresses = await getAddresses(ctx.from.id)
-  ctx.deleteMessage(thread.message_id)
+  const addresses = (await getAddresses(ctx.from.id)).map((d: any) => d.address)
   if (addresses.length === 0) {
+    ctx.deleteMessage(thread.message_id)
     return ctx.reply(
       'No addresses connected',
       Markup.inlineKeyboard([[Markup.button.webApp('💰 Connect address', `${process.env.VITE_BASE_PATH}/airdrop/`)]])
     )
   }
+  const balances = await Promise.all(addresses.map(getEthBalances))
+  debug('balances %o', balances)
+  const formatBalances = (balances: any) => {
+    if (!balances?.balance) return ''
+    debug('balance %o', balances.balance)
+    balances.balance.forEach((b: any) => debug(b.verified_contract, b.symbol, formatUnits(b.balance, b.decimals)))
+    return balances.balance
+      .map((b: any) => (b.verified_contract ? `\n          \- ${b.symbol}: ${formatUnits(b.balance, b.decimals)}` : ''))
+      .join('')
+  }
+  const addressWithBalances = addresses
+    .map((d, i) => `\n       \- ${d.substring(0, 8)}...${d.substring(d.length - 6)}${formatBalances(balances[i])}`)
+    .join('')
+  ctx.deleteMessage(thread.message_id)
   ctx.reply(
     `👤 Username: ${ctx.from.username}\n📖 Connected addresses\
-${addresses
-  .map((d: any) => `\n       \- ${d.address.substring(0, 8)}...${d.address.substring(d.address.length - 6)}`)
-  .join('')}\n\
+${addressWithBalances}\n\
 💰 Accumulated rewards: 0\n\
 📈 Est. reward today: 0`
   )
