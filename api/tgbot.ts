@@ -18,7 +18,8 @@ bot.command('start', async (ctx) => {
       "NoCap.Tips is the first app that rewards you for your holdings without any additional requirements. Let's go big! No Cap! 🚀",
       Markup.inlineKeyboard([
         [Markup.button.callback('📈 My Profile', 'profile')],
-        [Markup.button.webApp('💰 Connect address', `${process.env.VITE_BASE_PATH}/airdrop/`)]
+        [Markup.button.webApp('💰 Connect address', `${process.env.VITE_BASE_PATH}/airdrop/`)],
+        [Markup.button.url('Add me to Group/Channel', `t.me/NoCapTipsBot?startgroup=botstart`)]
         // [Markup.button.callback('📩 Get Invite Link', 'invite')]
       ])
     )
