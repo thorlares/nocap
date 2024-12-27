@@ -4,6 +4,8 @@ import { SignJWT, jwtVerify } from 'jose'
 import d from 'debug'
 import { createHmac } from 'node:crypto'
 import { verifyMessage } from 'viem'
+import { createKysely } from '@vercel/postgres-kysely'
+import { DB } from '../api_lib/db/types.js'
 
 const debug = d('nc:airdrop')
 
@@ -33,7 +35,11 @@ function getCheckString(data: URLSearchParams) {
 async function handleAuth(request: Request) {
   const cookies = request.headers.get('cookie')?.split(';')
   const token_x = cookies?.find((c) => c.trim().startsWith('x='))?.split('=')?.[1]
-  const result: { x: any; tg: any } = { x: undefined, tg: undefined }
+  const result: { x: any; tg: any; addresses: any[] | undefined } = {
+    x: undefined,
+    tg: undefined,
+    addresses: undefined
+  }
 
   if (token_x) {
     debug('x token: %o', token_x)
@@ -52,8 +58,10 @@ async function handleAuth(request: Request) {
       const tgUser = JSON.parse(tgInitData.get('user')!)
       debug('tg user: %o', tgUser)
       result.tg = { id: tgUser.id, username: tgUser.username }
+      result.addresses = await getAddresses(tgUser.id)
     }
   }
+
   return new Response(
     JSON.stringify(result),
     result.tg
@@ -109,24 +117,6 @@ async function handleAuthXCallback(url: URL) {
     .catch((error) => new Response(error.message, { status: 500 }))
 }
 
-async function handleAuthTelegram(url: URL) {
-  const token = url.searchParams.get('token')
-
-  debug('tg token: %o', token)
-  const result = await jwtVerify(token!, JWT_SECRET_KEY)
-  debug('jwt result: %o', result)
-  if (!result) return new Response('Bad token', { status: 500 })
-
-  const cookieOptions = 'Path=/; Max-Age=604800; HttpOnly'
-  return new Response('', {
-    headers: {
-      'set-cookie': `tg=${token}; ${cookieOptions}`,
-      Location: `${process.env.VITE_BASE_PATH}/airdrop/`
-    },
-    status: 302
-  })
-}
-
 async function handleConnectEth(request: Request) {
   const cookies = request.headers.get('cookie')?.split(';')
   const token_tg = cookies?.find((c) => c.trim().startsWith('tg='))?.split('=')?.[1]
@@ -143,7 +133,43 @@ with telegram account @${result.payload.username} on NoCap.Tips\n\n\
 Telegram account: ${result.payload.username}(${result.payload.id})\n\
 Expires At: ${new Date(expire).toISOString()}\nNonce: ${nonce}`
   if (!(await verifyMessage({ address, message, signature }))) return new Response('Bad signature', { status: 400 })
-  return new Response('OK')
+
+  const db = createKysely<DB>({ connectionString: process.env.POSTGRES_URL })
+
+  const userResult = await db
+    .insertInto('user')
+    .values({
+      tgid: result.payload.id as number,
+      tgusername: result.payload.username as string
+    })
+    .onConflict((oc) => oc.column('tgid').doUpdateSet({ tgusername: result.payload.username as string }))
+    .returning('id')
+    .execute()
+
+  const userId = userResult[0]?.id
+
+  await db
+    .insertInto('eth_address')
+    .values({
+      address: address,
+      uid: userId
+    })
+    .onConflict((oc) => oc.column('address').doUpdateSet({ uid: userId }))
+    .execute()
+
+  return new Response(JSON.stringify(await getAddresses(result.payload.id)))
+}
+
+export async function getAddresses(tgid: any) {
+  const db = createKysely<DB>({ connectionString: process.env.POSTGRES_URL })
+
+  const addressesResult = await db
+    .selectFrom('eth_address')
+    .select('address')
+    .where('uid', '=', (qb) => qb.selectFrom('user').select('id').where('tgid', '=', tgid))
+    .execute()
+  debug('tg id: %o, addresses', tgid, addressesResult)
+  return addressesResult
 }
 
 export async function POST(request: Request) {
@@ -168,7 +194,6 @@ export async function GET(request: Request) {
     if (action == 'auth') return await handleAuth(request)
     else if (action == 'authcb') return await handleAuthXCallback(url)
     else if (action == 'authx') return await handleAuthX()
-    else if (action == 'authtg') return await handleAuthTelegram(url)
     else return new Response('Bad request', { status: 400 })
   } catch (e: any) {
     console.error(e)

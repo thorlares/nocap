@@ -1,10 +1,9 @@
 import { VercelRequest, VercelResponse } from '@vercel/node'
 import { Markup, Telegraf } from 'telegraf'
 import d from 'debug'
-import { SignJWT } from 'jose'
+import { getAddresses } from './airdrop.js'
 
 const debug = d('nc:tgbot')
-const secretKey = new TextEncoder().encode(process.env.JWT_SECRET!)
 
 if (!process.env.TGBOT_TOKEN) throw new Error('TGBOT_TOKEN is not configured')
 
@@ -12,29 +11,42 @@ const bot = new Telegraf(process.env.TGBOT_TOKEN)
 
 bot.command('start', async (ctx) => {
   if (ctx.payload) debug('invited by %o', ctx.payload)
-  const token = await new SignJWT({ id: ctx.from.id, username: ctx.from.username })
-    .setProtectedHeader({ alg: 'HS256' })
-    .setExpirationTime('7d')
-    .setIssuedAt()
-    .sign(secretKey)
   return ctx
     .reply(
       "NoCap.Tips is the first app that rewards you for your holdings without any additional requirements. Let's go big! No Cap! 🚀",
       Markup.inlineKeyboard([
-        [Markup.button.webApp('💰 Check My Holdings', `${process.env.VITE_BASE_PATH}/airdrop/`)]
-        // [Markup.button.callback('📈 My Profile', 'profile')],
+        [Markup.button.callback('📈 My Profile', 'profile')],
+        [Markup.button.webApp('💰 Connect address', `${process.env.VITE_BASE_PATH}/airdrop/`)]
         // [Markup.button.callback('📩 Get Invite Link', 'invite')]
       ])
     )
     .catch(console.error)
 })
 
-bot.action('profile', (ctx) => ctx.reply('https://nocap.tips'))
+bot.action('profile', async (ctx) => {
+  const thread = await ctx.reply('Loading')
+  const addresses = await getAddresses(ctx.from.id)
+  ctx.deleteMessage(thread.message_id)
+  if (addresses.length === 0) {
+    return ctx.reply(
+      'No addresses connected',
+      Markup.inlineKeyboard([[Markup.button.webApp('💰 Connect address', `${process.env.VITE_BASE_PATH}/airdrop/`)]])
+    )
+  }
+  ctx.reply(
+    `👤 Username: ${ctx.from.username}\n📖 Connected addresses\
+${addresses
+  .map((d: any) => `\n       \- ${d.address.substring(0, 8)}...${d.address.substring(d.address.length - 6)}`)
+  .join('')}\n\
+💰 Accumulated rewards: 0\n\
+📈 Est. reward today: 0`
+  )
+})
 
 bot.action('invite', (ctx) =>
   ctx.reply(
-    `💰 Join NoCap.Tips to earn rewards simply by holding your coins! There is nothing else to do.
-🔥 Let's go big! No Cap!
+    `💰 Join NoCap.Tips to earn rewards simply by holding your coins! There is nothing else to do.\n\
+🔥 Let's go big! No Cap!\n\
 https://t.me/NoCapTipsBot?start=${ctx.from.username}`,
     { link_preview_options: { is_disabled: true } }
   )

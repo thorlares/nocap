@@ -245,6 +245,11 @@ export interface AuthUsers {
   updated_at: Timestamp | null;
 }
 
+export interface EthAddress {
+  address: string;
+  uid: Int8 | null;
+}
+
 export interface ExtensionsPgStatStatements {
   blk_read_time: number | null;
   blk_write_time: number | null;
@@ -478,9 +483,7 @@ export interface StorageS3MultipartUploadsParts {
 }
 
 export interface User {
-  eth_addresses: Json | null;
   id: Generated<Int8>;
-  sol_addresses: Json | null;
   tgid: Int8 | null;
   tgusername: string | null;
 }
@@ -525,6 +528,7 @@ export interface DB {
   "auth.sso_domains": AuthSsoDomains;
   "auth.sso_providers": AuthSsoProviders;
   "auth.users": AuthUsers;
+  eth_address: EthAddress;
   "extensions.pg_stat_statements": ExtensionsPgStatStatements;
   "extensions.pg_stat_statements_info": ExtensionsPgStatStatementsInfo;
   locked_amounts: LockedAmounts;

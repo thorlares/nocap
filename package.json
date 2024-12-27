@@ -14,7 +14,7 @@
     "tg-setwebhook:production": "NODE_ENV=production dotenvx run --convention=nextjs -- node scripts/tg-setwebhook.js",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "generateDbTypes": "NODE_TLS_REJECT_UNAUTHORIZED=0 kysely-codegen --out-file ./api_lib/db/types.ts"
+    "generateDbTypes": "NODE_TLS_REJECT_UNAUTHORIZED=0 kysely-codegen --url \"env(POSTGRES_URL)\" --out-file ./api_lib/db/types.ts"
   },
   "keywords": [],
   "author": "",

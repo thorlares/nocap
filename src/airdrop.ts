@@ -10,7 +10,7 @@ import '@shoelace-style/shoelace/dist/components/icon/icon.js'
 import '@shoelace-style/shoelace/dist/components/skeleton/skeleton.js'
 import { setBasePath } from '@shoelace-style/shoelace/dist/utilities/base-path.js'
 import { when } from 'lit/directives/when.js'
-import { ensureSuccess, getJson } from '../lib/fetch'
+import { getJson } from '../lib/fetch'
 // import { createAppKit } from '@reown/appkit'
 // import { mainnet, solana } from '@reown/appkit/networks'
 // import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
@@ -113,15 +113,13 @@ export class AppAirdrop extends LitElement {
       .then(getJson)
       .then((data) => {
         this.auth = data
-        if (this.auth.userId && this.auth.screenName) this.loadAddresses()
+        this.addresses = data.addresses.map((d: any) => d.address)
       })
       .catch((error) => {
         console.error(error)
         this.auth = { error }
       })
   }
-
-  private loadAddresses() {}
 
   render() {
     return html`
@@ -175,15 +173,19 @@ export class AppAirdrop extends LitElement {
             <div>
               ${when(
                 this.addresses,
-                (addresses) => html`
-                  <ul>
-                    ${map(
-                      addresses,
-                      (address: string) =>
-                        html`<li>${address.substring(0, 8)}...${address.substring(address.length - 6)}</li>`
-                    )}
-                  </ul>
-                `
+                (addresses) => {
+                  if (addresses.length === 0) return html`<div>No address connected yet.</div>`
+                  return html`
+                    <ul>
+                      ${map(
+                        addresses,
+                        (address: string) =>
+                          html`<li>${address.substring(0, 8)}...${address.substring(address.length - 6)}</li>`
+                      )}
+                    </ul>
+                  `
+                },
+                () => html`<div class="animate-pulse w-16 h-2 bg-slate-600 rounded my-2"></div>`
               )}
               ${when(
                 this.connectedAddress,
@@ -214,7 +216,7 @@ export class AppAirdrop extends LitElement {
                     >Disconnect</sl-button
                   >`
                 },
-                () => html`<div class="animate-pulse w-16 h-2 bg-slate-600 rounded mt-2"></div>`
+                () => html`<div class="animate-pulse w-16 h-2 bg-slate-600 rounded my-2"></div>`
               )}
             </div>
           </div>
@@ -257,8 +259,9 @@ export class AppAirdrop extends LitElement {
             nonce
           })
         })
-          .then(ensureSuccess)
-          .then(() => {
+          .then(getJson)
+          .then((addresses) => {
+            this.addresses = addresses.map((d: any) => d.address)
             this.connectedAddress = undefined
             this.universalUi.disconnect()
           })
