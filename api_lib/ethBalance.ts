@@ -9,7 +9,7 @@ async function getMoralisPrice(address: string) {
     .then((response) => {
       if (response.result) {
         return {
-          id: address,
+          address,
           balance: response.result,
           timestamp: Date.now()
         }
@@ -29,6 +29,6 @@ export async function getEthBalances(address: string) {
   if (price) return price
 
   const newPrice = await getMoralisPrice(address)
-  await kv.set(balanceCacheKey, newPrice, { ex: 600 })
+  await kv.set(balanceCacheKey, newPrice, { ex: 60 * 60 })
   return newPrice
 }

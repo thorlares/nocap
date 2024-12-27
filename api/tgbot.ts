@@ -40,9 +40,13 @@ bot.action('profile', async (ctx) => {
   const formatBalances = (balances: any) => {
     if (!balances?.balance) return ''
     debug('balance %o', balances.balance)
-    balances.balance.forEach((b: any) => debug(b.verified_contract, b.symbol, formatUnits(b.balance, b.decimals)))
     return balances.balance
-      .map((b: any) => (b.verified_contract ? `\n          \- ${b.symbol}: ${formatUnits(b.balance, b.decimals)}` : ''))
+      .map((b: any) => {
+        debug(b.verifiedContract, b.verified_contract, b.symbol, formatUnits(b.balance, b.decimals))
+        return b.verifiedContract || b.verified_contract
+          ? `\n          \- ${b.symbol}: ${formatUnits(b.balance, b.decimals)}`
+          : ''
+      })
       .join('')
   }
   const addressWithBalances = addresses
