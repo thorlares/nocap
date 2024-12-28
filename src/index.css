@@ -1,0 +1,5 @@
+@import '@fontsource/jura/300.css';
+
+:host {
+  @apply font-light;
+}
