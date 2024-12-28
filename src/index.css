@@ -1,12 +1,11 @@
-@import '@fontsource/jura/300.css';
-
 :host {
   @apply font-light;
   font-family: 'Jura', sans-serif;
 
   sl-button.earn::part(base) {
-    @apply text-2xl text-black items-center;
-    --sl-input-height-medium: 52px;
+    @apply text-3xl text-black items-center font-semibold;
+    font-family: 'Arial', sans-serif;
+    --sl-input-height-medium: 68px;
     --sl-input-border-width: 6px;
 
     border-radius: 0;
