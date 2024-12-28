@@ -1,5 +1,46 @@
 @import '@fontsource/jura/300.css';
 
+
+@keyframes move {
+  to {
+    transform: translate(100%);
+  }
+}
+
 :host {
   @apply font-light;
+  font-family: 'Jura', sans-serif;
+
+  div.slide span {
+    position: relative;
+    transform: translate(0);
+    animation: move 10s linear infinite;
+  }
+
+  sl-button.earn::part(base) {
+    @apply text-2xl text-black items-center;
+    --sl-input-height-medium: 52px;
+    --sl-input-border-width: 6px;
+
+    border-radius: 0;
+    background-color: #adadad;
+    border-top-color: #bdbdbd;
+    border-left-color: #cecece;
+    border-bottom-color: #8a8a8a;
+    border-right-color: #686868;
+    transition: var(--sl-transition-medium) transform ease, var(--sl-transition-medium) border ease;
+  }
+
+  sl-button.earn::part(base):hover {
+    transform: scale(1.05);
+  }
+
+  sl-button.earn::part(base):active {
+    transform: scale(1.05) translateY(2px);
+  }
+
+  sl-button.earn::part(base):focus-visible {
+    outline: dashed 2px #cecece;
+    outline-offset: 4px;
+  }
 }
