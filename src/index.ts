@@ -39,49 +39,43 @@ export class AppIndex extends LitElement {
           ></span
         >
       </main>
-      <div class="slide flex flex-col justify-between h-dvh text-sm text-neutral-400 whitespace-nowrap">
+      <div class="flex flex-col justify-between items-center h-dvh text-sm text-neutral-400 whitespace-nowrap">
         <span></span>
         <span></span>
-        <span class="text-amber-100" style="animation-delay: -7.5s;"
+        <span class="text-amber-100 ml-[calc(50vw)]"
           >दूसरों की मदद करने और इस तेजी बाज़ार का आनंद लेने के लिए अपने MEME का उपयोग करें</span
         >
-        <span class="text-[#e9c34b] mt-10" style="animation-duration: 12s;"
+        <span class="text-[#e9c34b] mt-10 -ml-[calc(80vw)]"
           >Une nouvelle piste pour les protocoles et scénarios de niveau billion</span
         >
-        <span class="text-[#abc2f1]" style="animation-delay: -6s;"
+        <span class="text-[#abc2f1] ml-[calc(40vw)]"
           >Ngày càng có nhiều người dùng trở thành người nắm giữ MEME coin</span
         >
-        <span class="text-[#edcdcd] mt-4" style="animation-delay: -7.7s;">手を使って他の人の成長を助ける</span>
-        <span class="text-[#f1fe5e]" style="animation-delay: -1s; animation-duration: 6s;"
+        <span class="text-[#edcdcd] mt-4 ml-[calc(55vw)]">手を使って他の人の成長を助ける</span>
+        <span class="text-[#f1fe5e] -ml-[calc(40vw)]"
           >Αφήστε τα token που κρατάτε να παράγουν μεγαλύτερη αξία αντί να κοιμούνται στο πορτοφόλι σας</span
         >
-        <span class="text-[#7da8d9]" style="animation-delay: -6.5s;"
+        <span class="text-[#7da8d9] ml-[calc(45vw)]"
           >Use seu MEME para ajudar outras pessoas em vez de dormir na sua carteira</span
         >
-        <span class="text-[#e938fa]" style="animation-delay: -0.5s;"
-          >Новый трек для протоколов и сценариев уровня триллион</span
-        >
-        <span class="text-[#e9c34b]" style="animation-delay: -7.9s; animation-duration: 7s;"
-          >سيكون هذا سوقًا صاعدة للغاية، وهذا عصر جديد</span
-        >
-        <span class="text-[#8b7ec0] mt-48" style="animation-delay: -3s;"
+        <span class="text-[#e938fa] -ml-[calc(55vw)]">Новый трек для протоколов и сценариев уровня триллион</span>
+        <span class="text-[#e9c34b] ml-[calc(65vw)]">سيكون هذا سوقًا صاعدة للغاية، وهذا عصر جديد</span>
+        <span class="text-[#8b7ec0] mt-48 -ml-[calc(45vw)]"
           >مسار جديد للبروتوكولات والسيناريوهات على مستوى تريليون</span
         >
-        <span class="text-[#cda8bd]" style="animation-delay: -6.5s;"
+        <span class="text-[#cda8bd] ml-[calc(45vw)]"
           >Att hålla MEME kommer också att tjäna ränta och kontrollera investeringar</span
         >
-        <span class="text-[#fae5a0]" style="animation-delay: -1s;">持有 MEME 也获得利息和控投</span>
-        <span class="text-[#cf826f]" style="animation-delay: -6.7s; animation-duration: 11s;"
-          >Rättvis lansering ger dig fler möjligheter och rikedom</span
-        >
-        <span class="text-[#b7b7b7]" style="animation-delay: -2s;"
+        <span class="text-[#fae5a0] -ml-[calc(65vw)]">持有 MEME 也获得利息和控投</span>
+        <span class="text-[#cf826f] ml-[calc(45vw)]">Rättvis lansering ger dig fler möjligheter och rikedom</span>
+        <span class="text-[#b7b7b7] -ml-[calc(45vw)]"
           >ཁྱེད་རང་གི་དངུལ་ཁུག་ནང་ཉལ་བའི་ཚབ་ཏུ་གཞན་ལ་རོགས་རམ་བྱེད་པར་ཁྱེད་རང་གི་MEMEབེད་སྤྱོད་བྱོས།</span
         >
-        <span class="text-[#497468]" style="animation-delay: -7.8s;">새로운 시대가 곧 올 것이다. 우리는 가고 있다</span>
-        <span class="text-[#79fb40]" style="animation-delay: -6s; animation-duration: 6s;"
+        <span class="text-[#497468] ml-[calc(60vw)]">새로운 시대가 곧 올 것이다. 우리는 가고 있다</span>
+        <span class="text-[#79fb40] ml-[calc(45vw)]"
           >ତୁମେ ଧରିଥିବା ଟୋକେନ୍ ଗୁଡିକ ତୁମର ୱାଲେଟରେ ଶୋଇବା ପରିବର୍ତ୍ତେ ଅଧିକ ମୂଲ୍ୟ ସୃଷ୍ଟି କରିବାକୁ ଦିଅ |</span
         >
-        <span class="text-[#f0913c]" style="animation-delay: -0.2s;"
+        <span class="text-[#f0913c] -ml-[calc(65vw)]"
           >अन्येषां साहाय्यार्थं, स्वस्य प्राप्त्यर्थं, अस्य वृषभविपण्यस्य आनन्दं च प्राप्तुं स्वस्य NFT इत्यस्य उपयोगं
           कुर्वन्तु</span
         >
