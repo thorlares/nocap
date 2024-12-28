@@ -1,6 +1,18 @@
+@keyframes move {
+  to {
+    transform: translate(100%);
+  }
+}
+
 :host {
   @apply font-light;
   font-family: 'Jura', sans-serif;
+
+  div.slide span {
+    position: relative;
+    transform: translate(-15%);
+    animation: move 10s linear infinite;
+  }
 
   sl-button.earn::part(base) {
     @apply text-3xl text-black items-center font-semibold;
