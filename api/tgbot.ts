@@ -1,7 +1,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node'
 import { Markup, Telegraf } from 'telegraf'
 import d from 'debug'
-import { getAddresses } from './airdrop.js'
+import { getAddressesEth } from './airdrop.js'
 import { getEthBalances } from '../api_lib/ethBalance.js'
 import { formatUnits } from 'viem'
 
@@ -29,7 +29,7 @@ bot.command('start', async (ctx) => {
 
 bot.action('profile', async (ctx) => {
   const thread = await ctx.reply('Loading')
-  const addresses = (await getAddresses(ctx.from.id)).map((d: any) => d.address)
+  const addresses = (await getAddressesEth(ctx.from.id)).map((d: any) => d.address)
   if (addresses.length === 0) {
     ctx.deleteMessage(thread.message_id)
     return ctx.reply(
