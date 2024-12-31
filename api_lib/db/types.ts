@@ -247,6 +247,7 @@ export interface AuthUsers {
 
 export interface EthAddress {
   address: string;
+  created_at: Generated<Timestamp | null>;
   uid: Int8 | null;
 }
 
@@ -416,6 +417,12 @@ export interface RealtimeSubscription {
   subscription_id: string;
 }
 
+export interface SolAddress {
+  address: string;
+  created_at: Generated<Timestamp | null>;
+  uid: Int8 | null;
+}
+
 export interface StorageBuckets {
   allowed_mime_types: string[] | null;
   avif_autodetection: Generated<boolean | null>;
@@ -483,6 +490,7 @@ export interface StorageS3MultipartUploadsParts {
 }
 
 export interface User {
+  created_at: Generated<Timestamp | null>;
   id: Generated<Int8>;
   tgid: Int8 | null;
   tgusername: string | null;
@@ -541,6 +549,7 @@ export interface DB {
   "realtime.messages": RealtimeMessages;
   "realtime.schema_migrations": RealtimeSchemaMigrations;
   "realtime.subscription": RealtimeSubscription;
+  sol_address: SolAddress;
   "storage.buckets": StorageBuckets;
   "storage.migrations": StorageMigrations;
   "storage.objects": StorageObjects;

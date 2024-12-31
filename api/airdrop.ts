@@ -6,6 +6,9 @@ import { createHmac } from 'node:crypto'
 import { verifyMessage } from 'viem'
 import { createKysely } from '@vercel/postgres-kysely'
 import { DB } from '../api_lib/db/types.js'
+import nacl from 'tweetnacl'
+import { PublicKey } from '@solana/web3.js'
+import { utf8ToBytes, hexToBytes } from '@noble/hashes/utils'
 
 const debug = d('nc:airdrop')
 
@@ -35,10 +38,11 @@ function getCheckString(data: URLSearchParams) {
 async function handleAuth(request: Request) {
   const cookies = request.headers.get('cookie')?.split(';')
   const token_x = cookies?.find((c) => c.trim().startsWith('x='))?.split('=')?.[1]
-  const result: { x: any; tg: any; addresses: any[] | undefined } = {
+  const result: { x: any; tg: any; addressesEth: any[] | undefined; addressesSol: any[] | undefined } = {
     x: undefined,
     tg: undefined,
-    addresses: undefined
+    addressesEth: undefined,
+    addressesSol: undefined
   }
 
   if (token_x) {
@@ -58,7 +62,8 @@ async function handleAuth(request: Request) {
       const tgUser = JSON.parse(tgInitData.get('user')!)
       debug('tg user: %o', tgUser)
       result.tg = { id: tgUser.id, username: tgUser.username }
-      result.addresses = await getAddresses(tgUser.id)
+      result.addressesEth = await getAddressesEth(tgUser.id)
+      result.addressesSol = await getAddressesSol(tgUser.id)
     }
   }
 
@@ -157,14 +162,72 @@ Expires At: ${new Date(expire).toISOString()}\nNonce: ${nonce}`
     .onConflict((oc) => oc.column('address').doUpdateSet({ uid: userId }))
     .execute()
 
-  return new Response(JSON.stringify(await getAddresses(result.payload.id)))
+  return new Response(JSON.stringify(await getAddressesEth(result.payload.id)))
 }
 
-export async function getAddresses(tgid: any) {
+export async function getAddressesEth(tgid: any) {
   const db = createKysely<DB>({ connectionString: process.env.POSTGRES_URL })
 
   const addressesResult = await db
     .selectFrom('eth_address')
+    .select('address')
+    .where('uid', '=', (qb) => qb.selectFrom('user').select('id').where('tgid', '=', tgid))
+    .execute()
+  debug('tg id: %o, addresses %o', tgid, addressesResult)
+  return addressesResult
+}
+
+async function handleConnectSol(request: Request) {
+  const cookies = request.headers.get('cookie')?.split(';')
+  const token_tg = cookies?.find((c) => c.trim().startsWith('tg='))?.split('=')?.[1]
+
+  const result = await jwtVerify(token_tg!, JWT_SECRET_KEY)
+  if (!result) return new Response('Bad telegram account', { status: 500 })
+
+  const { address, expire, nonce, signature } = await request.json()
+  const publicKey = new PublicKey(address)
+
+  if (expire < Date.now()) return new Response('Signature expired', { status: 400 })
+
+  const message = utf8ToBytes(`Sign this message to allow connecting your wallet address \
+with telegram account @${result.payload.username} on NoCap.Tips\n\n\
+Telegram account: ${result.payload.username}(${result.payload.id})\n\
+Expires At: ${new Date(expire).toISOString()}\nNonce: ${nonce}`)
+
+  if (!nacl.sign.detached.verify(message, hexToBytes(signature), publicKey.toBytes()))
+    return new Response('Bad signature', { status: 400 })
+
+  const db = createKysely<DB>({ connectionString: process.env.POSTGRES_URL })
+
+  const userResult = await db
+    .insertInto('user')
+    .values({
+      tgid: result.payload.id as number,
+      tgusername: result.payload.username as string
+    })
+    .onConflict((oc) => oc.column('tgid').doUpdateSet({ tgusername: result.payload.username as string }))
+    .returning('id')
+    .execute()
+
+  const userId = userResult[0]?.id
+
+  await db
+    .insertInto('sol_address')
+    .values({
+      address: address,
+      uid: userId
+    })
+    .onConflict((oc) => oc.column('address').doUpdateSet({ uid: userId }))
+    .execute()
+
+  return new Response(JSON.stringify(await getAddressesSol(result.payload.id)))
+}
+
+export async function getAddressesSol(tgid: any) {
+  const db = createKysely<DB>({ connectionString: process.env.POSTGRES_URL })
+
+  const addressesResult = await db
+    .selectFrom('sol_address')
     .select('address')
     .where('uid', '=', (qb) => qb.selectFrom('user').select('id').where('tgid', '=', tgid))
     .execute()
@@ -179,6 +242,7 @@ export async function POST(request: Request) {
   try {
     if (action == 'auth') return await handleAuth(request)
     else if (action == 'connectEth') return await handleConnectEth(request)
+    else if (action == 'connectSol') return await handleConnectSol(request)
     else return new Response('Bad request', { status: 400 })
   } catch (e: any) {
     console.error(e)
