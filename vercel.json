@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/airdrop?action=cronjob",
+      "schedule": "0 8 * * *"
+    }
+  ]
+}
