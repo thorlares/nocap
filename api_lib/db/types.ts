@@ -248,7 +248,15 @@ export interface AuthUsers {
 export interface EthAddress {
   address: string;
   created_at: Generated<Timestamp | null>;
+  id: Generated<Int8>;
   uid: Int8 | null;
+}
+
+export interface EthBalance {
+  balance: Json | null;
+  created_at: Generated<Timestamp>;
+  eth_id: Int8 | null;
+  id: Generated<Int8>;
 }
 
 export interface ExtensionsPgStatStatements {
@@ -420,7 +428,15 @@ export interface RealtimeSubscription {
 export interface SolAddress {
   address: string;
   created_at: Generated<Timestamp | null>;
+  id: Generated<Int8>;
   uid: Int8 | null;
+}
+
+export interface SolBalance {
+  balance: Json | null;
+  created_at: Generated<Timestamp>;
+  id: Generated<Int8>;
+  sol_id: Int8 | null;
 }
 
 export interface StorageBuckets {
@@ -537,6 +553,7 @@ export interface DB {
   "auth.sso_providers": AuthSsoProviders;
   "auth.users": AuthUsers;
   eth_address: EthAddress;
+  eth_balance: EthBalance;
   "extensions.pg_stat_statements": ExtensionsPgStatStatements;
   "extensions.pg_stat_statements_info": ExtensionsPgStatStatementsInfo;
   locked_amounts: LockedAmounts;
@@ -550,6 +567,7 @@ export interface DB {
   "realtime.schema_migrations": RealtimeSchemaMigrations;
   "realtime.subscription": RealtimeSubscription;
   sol_address: SolAddress;
+  sol_balance: SolBalance;
   "storage.buckets": StorageBuckets;
   "storage.migrations": StorageMigrations;
   "storage.objects": StorageObjects;

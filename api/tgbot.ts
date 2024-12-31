@@ -1,8 +1,9 @@
 import { VercelRequest, VercelResponse } from '@vercel/node'
 import { Markup, Telegraf } from 'telegraf'
 import d from 'debug'
-import { getAddressesEth } from './airdrop.js'
-import { getEthBalances } from '../api_lib/ethBalance.js'
+import { sql } from 'kysely'
+import { createKysely } from '@vercel/postgres-kysely'
+import { DB } from '../api_lib/db/types.js'
 import { formatUnits } from 'viem'
 
 const debug = d('nc:tgbot')
@@ -10,6 +11,10 @@ const debug = d('nc:tgbot')
 if (!process.env.TGBOT_TOKEN) throw new Error('TGBOT_TOKEN is not configured')
 
 const bot = new Telegraf(process.env.TGBOT_TOKEN)
+
+export async function tgSendMessage(tgid: any, message: string, options?: any): Promise<any> {
+  return bot.telegram.sendMessage(tgid, message, options)
+}
 
 bot.command('start', async (ctx) => {
   if (ctx.payload) debug('invited by %o', ctx.payload)
@@ -27,37 +32,126 @@ bot.command('start', async (ctx) => {
     .catch(console.error)
 })
 
+export async function getEthAddressesWithLastBalance(tgid: any) {
+  const db = createKysely<DB>({ connectionString: process.env.POSTGRES_URL })
+  return await db
+    .selectFrom('eth_address')
+    .leftJoin('user', 'user.id', 'eth_address.uid')
+    .leftJoin(
+      db
+        .selectFrom('eth_balance')
+        .select([
+          'eth_id',
+          'balance',
+          sql<number>`max(created_at) OVER (PARTITION BY eth_id ORDER BY created_at DESC)`.as('created_at')
+        ])
+        .as('latest_balance'),
+      'latest_balance.eth_id',
+      'eth_address.id'
+    )
+    .select(['eth_address.address', 'latest_balance.balance', 'latest_balance.created_at'])
+    .where('user.tgid', '=', tgid)
+    .execute()
+}
+
+export async function getSolAddressesWithLastBalance(tgid: any) {
+  const db = createKysely<DB>({ connectionString: process.env.POSTGRES_URL })
+  return await db
+    .selectFrom('sol_address')
+    .leftJoin('user', 'user.id', 'sol_address.uid')
+    .leftJoin(
+      db
+        .selectFrom('sol_balance')
+        .select([
+          'sol_id',
+          'balance',
+          sql<number>`max(created_at) OVER (PARTITION BY sol_id ORDER BY created_at DESC)`.as('created_at')
+        ])
+        .as('latest_balance'),
+      'latest_balance.sol_id',
+      'sol_address.id'
+    )
+    .select(['sol_address.address', 'latest_balance.balance', 'latest_balance.created_at'])
+    .where('user.tgid', '=', tgid)
+    .execute()
+}
+
 bot.action('profile', async (ctx) => {
   const thread = await ctx.reply('Loading')
-  const addresses = (await getAddressesEth(ctx.from.id)).map((d: any) => d.address)
-  if (addresses.length === 0) {
+  const addressesEth = await getEthAddressesWithLastBalance(ctx.from.id).catch((e) => {
+    debug('error %o', e)
+    return []
+  })
+  const addressesSol = await getSolAddressesWithLastBalance(ctx.from.id).catch((e) => {
+    debug('error %o', e)
+    return []
+  })
+  if (addressesEth.length === 0 && addressesSol.length === 0) {
     ctx.deleteMessage(thread.message_id)
     return ctx.reply(
       'No addresses connected',
       Markup.inlineKeyboard([[Markup.button.webApp('💰 Connect address', `${process.env.VITE_BASE_PATH}/airdrop/`)]])
     )
   }
-  const balances = await Promise.all(addresses.map(getEthBalances))
-  debug('balances %o', balances)
-  const formatBalances = (balances: any) => {
-    if (!balances?.balance) return ''
-    debug('balance %o', balances.balance)
-    return balances.balance
-      .map((b: any) => {
-        debug(b.verifiedContract, b.verified_contract, b.symbol, formatUnits(b.balance, b.decimals))
-        return b.verifiedContract || b.verified_contract
-          ? `\n          \- ${b.symbol}: ${formatUnits(b.balance, b.decimals)}`
-          : ''
-      })
-      .join('')
+  debug('balances %o', addressesEth)
+  const formatBalancesEth = (balance: any, created_at: any) => {
+    try {
+      debug('balance %o', balance)
+      if (!balance?.tokens) return '\n          - (No data yet)'
+      return (
+        balance.tokens
+          .map((b: any) => {
+            return b.verifiedContract || b.verified_contract
+              ? `\n          \- ${b.symbol}: ${formatUnits(b.balance, b.decimals)}`
+              : ''
+          })
+          .join('') + `\n            (${new Date(created_at).toLocaleDateString()})`
+      )
+    } catch (e) {
+      debug('error %o', e)
+      return ''
+    }
   }
-  const addressWithBalances = addresses
-    .map((d, i) => `\n       \- ${d.substring(0, 8)}...${d.substring(d.length - 6)}${formatBalances(balances[i])}`)
+  const addressWithBalancesEth = addressesEth
+    .map(
+      ({ address, balance, created_at }) =>
+        `\n       \- ${address.substring(0, 8)}...${address.substring(address.length - 6)}${formatBalancesEth(
+          balance,
+          created_at
+        )}`
+    )
+    .join('')
+  const formatBalancesSol = (balance: any, created_at: any) => {
+    try {
+      debug('balance %o', balance)
+      if (!balance?.tokens) return '\n          - (No data yet)'
+      return (
+        `\n          \- SOL: ${balance.nativeBalance}` +
+        balance.tokens
+          .map((b: any) => {
+            return `\n          \- ${b.symbol}: ${formatUnits(b.amount, b.decimals)}`
+          })
+          .join('') +
+        `\n            (${new Date(created_at).toLocaleDateString()})`
+      )
+    } catch (e) {
+      debug('error %o', e)
+      return ''
+    }
+  }
+  const addressWithBalancesSol = addressesSol
+    .map(
+      ({ address, balance, created_at }) =>
+        `\n       \- ${address.substring(0, 8)}...${address.substring(address.length - 6)}${formatBalancesSol(
+          balance,
+          created_at
+        )}`
+    )
     .join('')
   ctx.deleteMessage(thread.message_id)
   ctx.reply(
     `👤 Username: ${ctx.from.username}\n📖 Connected addresses\
-${addressWithBalances}\n\
+${addressWithBalancesEth}${addressWithBalancesSol}\n\
 💰 Accumulated rewards: 0\n\
 📈 Est. reward today: 0`
   )

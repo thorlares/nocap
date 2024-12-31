@@ -9,6 +9,10 @@ import { DB } from '../api_lib/db/types.js'
 import nacl from 'tweetnacl'
 import { PublicKey } from '@solana/web3.js'
 import { utf8ToBytes, hexToBytes } from '@noble/hashes/utils'
+import { waitUntil } from '@vercel/functions'
+import { getEthBalances } from '../api_lib/ethBalance.js'
+import { getSolBalances } from '../api_lib/solBalance.js'
+import { tgSendMessage } from './tgbot.js'
 
 const debug = d('nc:airdrop')
 
@@ -250,6 +254,85 @@ export async function POST(request: Request) {
   }
 }
 
+async function updateBalances() {
+  const db = createKysely<DB>({ connectionString: process.env.POSTGRES_URL })
+
+  // update eth balances
+  const ethAddressesToUpdate = await db
+    .selectFrom('eth_address')
+    .innerJoin('user', 'eth_address.uid', 'user.id')
+    .select(['eth_address.address', 'eth_address.id', 'user.tgid'])
+    .where(
+      'eth_address.id',
+      'not in',
+      db
+        .selectFrom('eth_balance')
+        .select('eth_id')
+        .where('created_at', '>', new Date(new Date().setHours(0, 0, 0, 0)))
+    )
+    .limit(30)
+    .execute()
+  debug('eth addresses to update: %o', ethAddressesToUpdate)
+  for (const address of ethAddressesToUpdate) {
+    await Promise.all([
+      new Promise((resolve) => setTimeout(resolve, 1000)),
+      getEthBalances(address.address)
+        .then((balance) => {
+          debug('eth balance for %s: %o', address.address, balance)
+          return db
+            .insertInto('eth_balance')
+            .values({
+              eth_id: address.id,
+              balance: JSON.stringify(balance)
+            })
+            .execute()
+            .then(() => tgSendMessage(address.tgid, `Balance for ${address.address} has been updated`))
+        })
+        .catch(console.error)
+    ])
+  }
+
+  // update sol balances
+  const solAddressesToUpdate = await db
+    .selectFrom('sol_address')
+    .innerJoin('user', 'sol_address.uid', 'user.id')
+    .select(['sol_address.address', 'sol_address.id', 'user.tgid'])
+    .where(
+      'sol_address.id',
+      'not in',
+      db
+        .selectFrom('sol_balance')
+        .select('sol_id')
+        .where('created_at', '>', new Date(new Date().setHours(0, 0, 0, 0)))
+    )
+    .limit(30)
+    .execute()
+  debug('sol addresses to update: %o', solAddressesToUpdate)
+  for (const address of solAddressesToUpdate) {
+    await Promise.all([
+      new Promise((resolve) => setTimeout(resolve, 1000)),
+      getSolBalances(address.address)
+        .then((result) => {
+          debug('sol balance for %s: %o', address.address, result)
+          return db
+            .insertInto('sol_balance')
+            .values({ sol_id: address.id, balance: JSON.stringify(result ?? {}) })
+            .execute()
+            .then(() => tgSendMessage(address.tgid, `Balance for ${address.address} has been updated`))
+        })
+        .catch(console.error)
+    ])
+  }
+}
+
+async function handleCronjob(request: Request) {
+  if (process.env.VERCEL_ENV && request.headers.get('Authorization') !== `Bearer ${process.env.CRON_SECRET}`)
+    return new Response('Unauthorized', { status: 401 })
+
+  waitUntil(updateBalances())
+  return new Response('OK', { status: 200 })
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url)
   const action = url.searchParams.get('action')
@@ -258,6 +341,7 @@ export async function GET(request: Request) {
     if (action == 'auth') return await handleAuth(request)
     else if (action == 'authcb') return await handleAuthXCallback(url)
     else if (action == 'authx') return await handleAuthX()
+    else if (action == 'cronjob') return await handleCronjob(request)
     else return new Response('Bad request', { status: 400 })
   } catch (e: any) {
     console.error(e)

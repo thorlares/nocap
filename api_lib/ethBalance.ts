@@ -1,34 +1,16 @@
-import { kv } from '@vercel/kv'
 import Moralis from 'moralis'
+import { EvmErc20TokenBalanceWithPrice } from '@moralisweb3/common-evm-utils'
 
-Moralis.start({ apiKey: process.env.MORALIS_API_KEY || '' })
+if (!Moralis.Core.isStarted) Moralis.start({ apiKey: process.env.MORALIS_API_KEY || '' })
 
-async function getMoralisPrice(address: string) {
+export async function getEthBalances(address: string): Promise<{
+  tokens: EvmErc20TokenBalanceWithPrice[]
+  type: string
+} | null> {
   return Moralis.EvmApi.wallets
     .getWalletTokenBalancesPrice({ chain: '0x1', address, excludeUnverifiedContracts: true })
     .then((response) => {
-      if (response.result) {
-        return {
-          address,
-          balance: response.result,
-          timestamp: Date.now()
-        }
-      }
-      return null
+      if (!response.result) throw new Error('No response from Moralis API')
+      return { tokens: response.result, type: 'moralis' }
     })
-    .catch((error) => {
-      console.error('Moralis API error:', error)
-      return null
-    })
-}
-
-export async function getEthBalances(address: string) {
-  const balanceCacheKey = `nc:eth:balance:${address}`
-
-  const price = await kv.get(balanceCacheKey)
-  if (price) return price
-
-  const newPrice = await getMoralisPrice(address)
-  await kv.set(balanceCacheKey, newPrice, { ex: 60 * 60 })
-  return newPrice
 }
