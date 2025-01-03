@@ -12,7 +12,7 @@ import { utf8ToBytes, hexToBytes } from '@noble/hashes/utils'
 import { waitUntil } from '@vercel/functions'
 import { getEthBalances } from '../api_lib/ethBalance.js'
 import { getSolBalances } from '../api_lib/solBalance.js'
-import { tgSendMessage } from './tgbot.js'
+// import { tgSendMessage } from './tgbot.js'
 
 const debug = d('nc:airdrop')
 
@@ -286,7 +286,7 @@ async function updateBalances() {
               balance: JSON.stringify(balance)
             })
             .execute()
-            .then(() => tgSendMessage(address.tgid, `Balance for ${address.address} has been updated`))
+          // .then(() => tgSendMessage(address.tgid, `Balance for ${address.address} has been updated`))
         })
         .catch(console.error)
     ])
@@ -318,7 +318,7 @@ async function updateBalances() {
             .insertInto('sol_balance')
             .values({ sol_id: address.id, balance: JSON.stringify(result ?? {}) })
             .execute()
-            .then(() => tgSendMessage(address.tgid, `Balance for ${address.address} has been updated`))
+          // .then(() => tgSendMessage(address.tgid, `Balance for ${address.address} has been updated`))
         })
         .catch(console.error)
     ])
