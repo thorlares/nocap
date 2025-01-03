@@ -326,7 +326,10 @@ async function updateBalances() {
 }
 
 async function handleCronjob(request: Request) {
-  if (process.env.VERCEL_ENV && request.headers.get('Authorization') !== `Bearer ${process.env.CRON_SECRET}`)
+  if (
+    process.env.VERCEL_ENV &&
+    (!process.env.CRON_SECRET || request.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`)
+  )
     return new Response('Unauthorized', { status: 401 })
 
   waitUntil(updateBalances())
