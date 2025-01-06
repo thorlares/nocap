@@ -43,13 +43,15 @@ export async function getEthAddressesWithLastBalance(tgid: any) {
         .select([
           'eth_id',
           'balance',
-          sql<number>`max(created_at) OVER (PARTITION BY eth_id ORDER BY created_at DESC)`.as('created_at')
+          'created_at',
+          sql<number>`ROW_NUMBER() OVER (PARTITION BY eth_id ORDER BY created_at DESC)`.as('rn')
         ])
         .as('latest_balance'),
       'latest_balance.eth_id',
       'eth_address.id'
     )
     .select(['eth_address.address', 'latest_balance.balance', 'latest_balance.created_at'])
+    .where('latest_balance.rn', '=', 1)
     .where('user.tgid', '=', tgid)
     .execute()
 }
@@ -65,13 +67,15 @@ export async function getSolAddressesWithLastBalance(tgid: any) {
         .select([
           'sol_id',
           'balance',
-          sql<number>`max(created_at) OVER (PARTITION BY sol_id ORDER BY created_at DESC)`.as('created_at')
+          'created_at',
+          sql<number>`ROW_NUMBER() OVER (PARTITION BY sol_id ORDER BY created_at DESC)`.as('rn')
         ])
         .as('latest_balance'),
       'latest_balance.sol_id',
       'sol_address.id'
     )
     .select(['sol_address.address', 'latest_balance.balance', 'latest_balance.created_at'])
+    .where('latest_balance.rn', '=', 1)
     .where('user.tgid', '=', tgid)
     .execute()
 }
